@@ -17,16 +17,40 @@ export function getBorder(node, elType, warpObj) {
 
   let borderWidth = isNoFill ? 0 : (parseInt(getTextByPathList(lineNode, ['attrs', 'w'])) / 12700)
   if (isNaN(borderWidth)) {
-    if (lineNode) borderWidth = 0
-    else if (elType !== 'obj') borderWidth = 0
-    else borderWidth = 1
+    const hasLineNode = lineNode && lineNode !== node
+    borderWidth = hasLineNode ? 9525 / 12700 : 0
   }
 
   let borderColor = getTextByPathList(lineNode, ['a:solidFill', 'a:srgbClr', 'attrs', 'val'])
+  if (borderColor) {
+    const alpha = getTextByPathList(lineNode, ['a:solidFill', 'a:srgbClr', 'a:alpha', 'attrs', 'val'])
+    if (alpha) {
+      const a = parseInt(alpha) / 100000
+      borderColor = tinycolor({ r: parseInt(borderColor.slice(0, 2), 16), g: parseInt(borderColor.slice(2, 4), 16), b: parseInt(borderColor.slice(4, 6), 16), a }).toRgbString()
+    }
+    else {
+      borderColor = `#${borderColor}`
+    }
+  }
+
   if (!borderColor) {
     const schemeClrNode = getTextByPathList(lineNode, ['a:solidFill', 'a:schemeClr'])
     const schemeClr = 'a:' + getTextByPathList(schemeClrNode, ['attrs', 'val'])
     borderColor = getSchemeColorFromTheme(schemeClr, warpObj)
+    if (borderColor) {
+      borderColor = `#${borderColor}`
+      const alpha = getTextByPathList(schemeClrNode, ['a:alpha', 'attrs', 'val'])
+      const shade = getTextByPathList(schemeClrNode, ['a:shade', 'attrs', 'val'])
+      if (shade) {
+        const s = parseInt(shade) / 100000
+        const color = tinycolor(borderColor).toHsl()
+        borderColor = tinycolor({ h: color.h, s: color.s, l: color.l * s }).toHexString()
+      }
+      if (alpha) {
+        const a = parseInt(alpha) / 100000
+        borderColor = tinycolor(borderColor).setAlpha(a).toRgbString()
+      }
+    }
   }
 
   if (!borderColor) {
@@ -35,19 +59,22 @@ export function getBorder(node, elType, warpObj) {
     borderColor = getSchemeColorFromTheme(schemeClr, warpObj)
 
     if (borderColor) {
-      let shade = getTextByPathList(schemeClrNode, ['a:shade', 'attrs', 'val'])
-
+      borderColor = `#${borderColor}`
+      const shade = getTextByPathList(schemeClrNode, ['a:shade', 'attrs', 'val'])
       if (shade) {
-        shade = parseInt(shade) / 100000
-        
-        const color = tinycolor('#' + borderColor).toHsl()
-        borderColor = tinycolor({ h: color.h, s: color.s, l: color.l * shade, a: color.a }).toHex()
+        const s = parseInt(shade) / 100000
+        const color = tinycolor(borderColor).toHsl()
+        borderColor = tinycolor({ h: color.h, s: color.s, l: color.l * s }).toHexString()
+      }
+      const alpha = getTextByPathList(schemeClrNode, ['a:alpha', 'attrs', 'val'])
+      if (alpha) {
+        const a = parseInt(alpha) / 100000
+        borderColor = tinycolor(borderColor).setAlpha(a).toRgbString()
       }
     }
   }
 
   if (!borderColor) borderColor = '#000000'
-  else borderColor = `#${borderColor}`
 
   const type = getTextByPathList(lineNode, ['a:prstDash', 'attrs', 'val'])
   let borderType = 'solid'

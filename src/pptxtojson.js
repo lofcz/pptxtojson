@@ -1019,22 +1019,62 @@ async function processPicNode(node, warpObj, source) {
     if (srcRectAttrs.l) rect.l = srcRectAttrs.l / 1000
     if (srcRectAttrs.r) rect.r = srcRectAttrs.r / 1000
   }
-  let geom = 'rect'
+
   const prstGeom = getTextByPathList(node, ['p:spPr', 'a:prstGeom', 'attrs', 'prst'])
   const custGeom = getTextByPathList(node, ['p:spPr', 'a:custGeom'])
 
-  if (prstGeom) {
-    geom = prstGeom
-  }
-  else if (custGeom) {
-    geom = identifyShape(custGeom)
-    if (geom !== 'custom') geom = `custom:${geom}`
-  }
-
   const { borderColor, borderWidth, borderType, strokeDasharray } = getBorder(node, undefined, warpObj)
-
   const filters = getPicFilters(node['p:blipFill'])
   const opacity = getPicFillOpacity(node['p:blipFill'])
+
+  if (prstGeom || custGeom) {
+    let shapType, path
+    if (custGeom) {
+      const identifiedShape = identifyShape(custGeom)
+      shapType = identifiedShape !== 'custom' ? `custom:${identifiedShape}` : 'custom'
+      path = getCustomShapePath(custGeom, width, height)
+    }
+    else {
+      shapType = prstGeom
+      path = getShapePath(prstGeom, width, height, node) || ''
+    }
+
+    const fill = {
+      type: 'image',
+      value: {
+        ref: imageData.ref,
+        base64: imageData.base64,
+        blob: imageData.blob,
+        opacity,
+        rect,
+      },
+    }
+
+    const shapeDataJson = {
+      type: 'shape',
+      shapType,
+      path,
+      top,
+      left,
+      width,
+      height,
+      rotate,
+      isFlipV,
+      isFlipH,
+      order,
+      fill,
+      content: '',
+      borderColor,
+      borderWidth,
+      borderType,
+      borderStrokeDasharray: strokeDasharray,
+    }
+
+    if (filters) shapeDataJson.filters = filters
+    if (link) shapeDataJson.link = link
+
+    return shapeDataJson
+  }
 
   const imageDataJson = {
     type: 'image',
@@ -1050,7 +1090,7 @@ async function processPicNode(node, warpObj, source) {
     isFlipH,
     order,
     rect,
-    geom,
+    geom: 'rect',
     borderColor,
     borderWidth,
     borderType,
