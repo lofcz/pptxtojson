@@ -433,7 +433,7 @@
 
             try {
               const json = await pptxtojson.parse(e.target.result, {
-                imageMode: 'both',
+                imageMode: 'blob',
                 videoMode: 'blob',
                 audioMode: 'blob',
               })
