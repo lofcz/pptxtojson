@@ -87,6 +87,8 @@ function getFontAttr(styleNodes, attrName) {
 
 function getFontTypeface(styleNodes) {
   for (const styleNode of styleNodes) {
+    const symTypeface = getTextByPathList(styleNode, ['a:sym', 'attrs', 'typeface'])
+    if (symTypeface) return symTypeface
     const typeface = getTextByPathList(styleNode, ['a:latin', 'attrs', 'typeface']) || getTextByPathList(styleNode, ['a:ea', 'attrs', 'typeface'])
     if (typeface) return typeface
   }
