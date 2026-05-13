@@ -1,7 +1,7 @@
 import JSZip from 'jszip'
 import { readXmlFile } from './readXmlFile'
 import { getBorder } from './border'
-import { getSlideBackgroundFill, getShapeFill, getSolidFill, getPicFill, getPicFilters, getImageData, getVideoData, getAudioData } from './fill'
+import { getSlideBackgroundFill, getShapeFill, getSolidFill, getPicFill, getPicFilters, getPicFillOpacity, getImageData, getVideoData, getAudioData } from './fill'
 import { getChartInfo } from './chart'
 import { getVerticalAlign, getTextAutoFit } from './paragraph'
 import { getTextInsets } from './textInsets'
@@ -112,9 +112,11 @@ async function getSlideInfo(zip) {
 }
 
 async function getTheme(zip) {
+  let themeContent = null
+  let themeURI
+
   const preResContent = await readXmlFile(zip, 'ppt/_rels/presentation.xml.rels')
   const relationshipArray = preResContent['Relationships']['Relationship']
-  let themeURI
 
   if (relationshipArray.constructor === Array) {
     for (const relationshipItem of relationshipArray) {
@@ -123,20 +125,43 @@ async function getTheme(zip) {
         break
       }
     }
-  } 
+  }
   else if (relationshipArray['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
     themeURI = relationshipArray['attrs']['Target']
   }
 
-  const themeContent = await readXmlFile(zip, 'ppt/' + themeURI)
+  if (!themeURI) {
+    const masterResContent = await readXmlFile(zip, 'ppt/slideMasters/_rels/slideMaster1.xml.rels')
+    const masterRelationshipArray = masterResContent['Relationships']['Relationship']
+    if (masterRelationshipArray.constructor === Array) {
+      for (const relationshipItem of masterRelationshipArray) {
+        if (relationshipItem['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
+          themeURI = relationshipItem['attrs']['Target']
+          break
+        }
+      }
+    }
+    else if (masterRelationshipArray['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
+      themeURI = masterRelationshipArray['attrs']['Target']
+    }
+  }
+
+  if (themeURI) {
+    if (themeURI.startsWith('../')) {
+      themeURI = themeURI.substring(3)
+    }
+    themeContent = await readXmlFile(zip, 'ppt/' + themeURI)
+  }
 
   const themeColors = []
-  const clrScheme = getTextByPathList(themeContent, ['a:theme', 'a:themeElements', 'a:clrScheme'])
-  if (clrScheme) {
-    for (let i = 1; i <= 6; i++) {
-      if (clrScheme[`a:accent${i}`] === undefined) break
-      const color = getTextByPathList(clrScheme, [`a:accent${i}`, 'a:srgbClr', 'attrs', 'val'])
-      if (color) themeColors.push('#' + color)
+  if (themeContent) {
+    const clrScheme = getTextByPathList(themeContent, ['a:theme', 'a:themeElements', 'a:clrScheme'])
+    if (clrScheme) {
+      for (let i = 1; i <= 6; i++) {
+        if (clrScheme[`a:accent${i}`] === undefined) break
+        const color = getTextByPathList(clrScheme, [`a:accent${i}`, 'a:srgbClr', 'attrs', 'val'])
+        if (color) themeColors.push('#' + color)
+      }
     }
   }
 
@@ -318,12 +343,18 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
 
   const transition = parseTransition(transitionNode)
 
+  const showMasterSpOnSlide = getTextByPathList(slideContent, ['p:sld', 'attrs', 'showMasterSp'])
+  const showMasterSpOnLayout = getTextByPathList(slideLayoutContent, ['p:sldLayout', 'attrs', 'showMasterSp'])
+  const isHidden = v => v === '0' || v === 'false'
+  const hideBackground = isHidden(showMasterSpOnSlide) || isHidden(showMasterSpOnLayout)
+
   return {
     fill,
     elements,
     layoutElements,
     note,
     transition,
+    hideBackground,
   }
 }
 
@@ -1003,6 +1034,7 @@ async function processPicNode(node, warpObj, source) {
   const { borderColor, borderWidth, borderType, strokeDasharray } = getBorder(node, undefined, warpObj)
 
   const filters = getPicFilters(node['p:blipFill'])
+  const opacity = getPicFillOpacity(node['p:blipFill'])
 
   const imageDataJson = {
     type: 'image',
@@ -1023,6 +1055,7 @@ async function processPicNode(node, warpObj, source) {
     borderWidth,
     borderType,
     borderStrokeDasharray: strokeDasharray,
+    opacity,
   }
 
   if (filters) imageDataJson.filters = filters
