@@ -86,7 +86,12 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
         text += `<${listType}>`
         listTypes[listLevel] = listType
       }
-      text += `<li style="${styleText}">`
+      const firstRNode = rNode ? rNode[0] : pNode
+      const liLevel = listLevel + 1
+      const liFontSize = getFontSize(firstRNode, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, liLevel, defaultTextStyle)
+      let liStyleText = styleText
+      if (liFontSize) liStyleText += `font-size: ${liFontSize};`
+      text += `<li style="${liStyleText}">`
     }
     else {
       while (listTypes.length > 0) {

@@ -283,6 +283,7 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   }
 
   if (themeFilename) {
+    themeContent = await readXmlFile(zip, themeFilename)
     const themeName = themeFilename.split('/').pop()
     const themeResFileName = themeFilename.replace(themeName, '_rels/' + themeName) + '.rels'
     const themeResContent = await readXmlFile(zip, themeResFileName)
@@ -344,9 +345,8 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const transition = parseTransition(transitionNode)
 
   const showMasterSpOnSlide = getTextByPathList(slideContent, ['p:sld', 'attrs', 'showMasterSp'])
-  const showMasterSpOnLayout = getTextByPathList(slideLayoutContent, ['p:sldLayout', 'attrs', 'showMasterSp'])
   const isHidden = v => v === '0' || v === 'false'
-  const hideBackground = isHidden(showMasterSpOnSlide) || isHidden(showMasterSpOnLayout)
+  const hideBackground = isHidden(showMasterSpOnSlide)
 
   return {
     fill,
@@ -630,8 +630,8 @@ async function processGroupSpNode(node, warpObj, source, parentGroupHierarchy = 
   const chcx = parseInt(xfrmNode['a:chExt']['attrs']['cx']) * RATIO_EMUs_Points
   const chcy = parseInt(xfrmNode['a:chExt']['attrs']['cy']) * RATIO_EMUs_Points
 
-  const isFlipV = getTextByPathList(xfrmNode, ['attrs', 'flipV']) === '1'
-  const isFlipH = getTextByPathList(xfrmNode, ['attrs', 'flipH']) === '1'
+  const isFlipV = getTextByPathList(xfrmNode, ['attrs', 'flipV']) === '1' || getTextByPathList(xfrmNode, ['attrs', 'flipV']) === 'true'
+  const isFlipH = getTextByPathList(xfrmNode, ['attrs', 'flipH']) === '1' || getTextByPathList(xfrmNode, ['attrs', 'flipH']) === 'true'
 
   let rotate = getTextByPathList(xfrmNode, ['attrs', 'rot']) || 0
   if (rotate) rotate = angleToDegrees(rotate)
@@ -781,8 +781,8 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   const { top, left } = getPosition(slideXfrmNode, slideLayoutXfrmNode, slideMasterXfrmNode)
   const { width, height } = getSize(slideXfrmNode, slideLayoutXfrmNode, slideMasterXfrmNode)
 
-  const isFlipV = getTextByPathList(slideXfrmNode, ['attrs', 'flipV']) === '1'
-  const isFlipH = getTextByPathList(slideXfrmNode, ['attrs', 'flipH']) === '1'
+  const isFlipV = getTextByPathList(slideXfrmNode, ['attrs', 'flipV']) === '1' || getTextByPathList(slideXfrmNode, ['attrs', 'flipV']) === 'true'
+  const isFlipH = getTextByPathList(slideXfrmNode, ['attrs', 'flipH']) === '1' || getTextByPathList(slideXfrmNode, ['attrs', 'flipH']) === 'true'
 
   const rotate = angleToDegrees(getTextByPathList(slideXfrmNode, ['attrs', 'rot']))
 
@@ -907,8 +907,8 @@ async function processPicNode(node, warpObj, source) {
   const { width, height } = getSize(xfrmNode, undefined, undefined)
   const imageData = await getImageData(imgName, warpObj)
 
-  const isFlipV = getTextByPathList(xfrmNode, ['attrs', 'flipV']) === '1'
-  const isFlipH = getTextByPathList(xfrmNode, ['attrs', 'flipH']) === '1'
+  const isFlipV = getTextByPathList(xfrmNode, ['attrs', 'flipV']) === '1' || getTextByPathList(xfrmNode, ['attrs', 'flipV']) === 'true'
+  const isFlipH = getTextByPathList(xfrmNode, ['attrs', 'flipH']) === '1' || getTextByPathList(xfrmNode, ['attrs', 'flipH']) === 'true'
 
   let rotate = 0
   const rotateNode = getTextByPathList(node, ['p:spPr', 'a:xfrm', 'attrs', 'rot'])

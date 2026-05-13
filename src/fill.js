@@ -37,6 +37,13 @@ function createImageData(ref = '') {
     ref,
     base64: '',
     blob: '',
+    align: {
+      t: 0,
+      b: 0,
+      l: 0,
+      r: 0,
+    },
+    alignType: 'stretch',
   }
 }
 
@@ -172,7 +179,39 @@ export async function getPicFill(type, node, warpObj) {
   }
   if (!imgPath) return createImageData()
 
-  return await getImageData(imgPath, warpObj)
+  const imageData = await getImageData(imgPath, warpObj)
+
+  const align = { t: 0, b: 0, l: 0, r: 0 }
+  let alignType = 'stretch'
+
+  if (node['a:stretch']) {
+    alignType = 'stretch'
+    const fillRectAttrs = getTextByPathList(node, ['a:stretch', 'a:fillRect', 'attrs'])
+    if (fillRectAttrs) {
+      if (fillRectAttrs.t) align.t = parseInt(fillRectAttrs.t) / 1000
+      if (fillRectAttrs.b) align.b = parseInt(fillRectAttrs.b) / 1000
+      if (fillRectAttrs.l) align.l = parseInt(fillRectAttrs.l) / 1000
+      if (fillRectAttrs.r) align.r = parseInt(fillRectAttrs.r) / 1000
+    }
+  }
+  else if (node['a:tile']) {
+    alignType = 'tile'
+    const tileAttrs = getTextByPathList(node, ['a:tile', 'attrs'])
+    if (tileAttrs) {
+      if (tileAttrs.t) align.t = parseInt(tileAttrs.t) / 1000
+      if (tileAttrs.b) align.b = parseInt(tileAttrs.b) / 1000
+      if (tileAttrs.l) align.l = parseInt(tileAttrs.l) / 1000
+      if (tileAttrs.r) align.r = parseInt(tileAttrs.r) / 1000
+    }
+  }
+  else if (node['a:scale']) {
+    alignType = 'scale'
+  }
+
+  imageData.align = align
+  imageData.alignType = alignType
+
+  return imageData
 }
 
 export function getPicFillOpacity(node) {
@@ -728,6 +767,8 @@ export async function getShapeFill(node, warpObj, source, groupHierarchy = []) {
       base64: picFill.base64,
       blob: picFill.blob,
       opacity,
+      align: picFill.align,
+      alignType: picFill.alignType,
     }
     type = 'image'
   }
@@ -793,6 +834,8 @@ async function findFillInGroupHierarchy(groupHierarchy, warpObj, source) {
             base64: picFill.base64,
             blob: picFill.blob,
             opacity,
+            align: picFill.align,
+            alignType: picFill.alignType,
           },
         }
       }
