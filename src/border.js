@@ -1,22 +1,5 @@
-import tinycolor from 'tinycolor2'
-import { getSchemeColorFromTheme } from './schemeColor'
-import { getTextByPathList, angleToDegrees } from './utils'
-
-function resolveSchemeColor(schemeClrNode, baseColor) {
-  let color = baseColor
-  const shade = getTextByPathList(schemeClrNode, ['a:shade', 'attrs', 'val'])
-  if (shade) {
-    const s = parseInt(shade) / 100000
-    const hsl = tinycolor(color).toHsl()
-    color = tinycolor({ h: hsl.h, s: hsl.s, l: hsl.l * s }).toHexString()
-  }
-  const alpha = getTextByPathList(schemeClrNode, ['a:alpha', 'attrs', 'val'])
-  if (alpha) {
-    const a = parseInt(alpha) / 100000
-    color = tinycolor(color).setAlpha(a).toRgbString()
-  }
-  return color
-}
+import { getSolidFill, getGradientFill } from './fill'
+import { getTextByPathList } from './utils'
 
 export function getBorder(node, elType, warpObj) {
   let lineNode = getTextByPathList(node, ['p:spPr', 'a:ln'])
@@ -41,69 +24,23 @@ export function getBorder(node, elType, warpObj) {
 
   let borderColor = null
 
-  const srgbVal = getTextByPathList(lineNode, ['a:solidFill', 'a:srgbClr', 'attrs', 'val'])
-  if (srgbVal) {
-    let color = `#${srgbVal}`
-    const alpha = getTextByPathList(lineNode, ['a:solidFill', 'a:srgbClr', 'a:alpha', 'attrs', 'val'])
-    if (alpha) {
-      const a = parseInt(alpha) / 100000
-      color = tinycolor(color).setAlpha(a).toRgbString()
-    }
-    borderColor = { type: 'color', value: color }
+  if (lineNode['a:solidFill']) {
+    const color = getSolidFill(lineNode['a:solidFill'], undefined, undefined, warpObj)
+    if (color) borderColor = { type: 'color', value: color }
   }
 
   if (!borderColor) {
-    const schemeClrNode = getTextByPathList(lineNode, ['a:solidFill', 'a:schemeClr'])
-    const resolved = getSchemeColorFromTheme('a:' + getTextByPathList(schemeClrNode, ['attrs', 'val']), warpObj)
-    if (resolved) {
-      borderColor = { type: 'color', value: resolveSchemeColor(schemeClrNode, `#${resolved}`, warpObj) }
+    const lnRefFill = getTextByPathList(node, ['p:style', 'a:lnRef'])
+    if (lnRefFill) {
+      const color = getSolidFill(lnRefFill, undefined, undefined, warpObj)
+      if (color) borderColor = { type: 'color', value: color }
     }
   }
 
-  if (!borderColor) {
-    const schemeClrNode = getTextByPathList(node, ['p:style', 'a:lnRef', 'a:schemeClr'])
-    const resolved = getSchemeColorFromTheme('a:' + getTextByPathList(schemeClrNode, ['attrs', 'val']), warpObj)
-    if (resolved) {
-      borderColor = { type: 'color', value: resolveSchemeColor(schemeClrNode, `#${resolved}`, warpObj) }
-    }
-  }
-
-  if (!borderColor) {
-    const gradFillNode = getTextByPathList(lineNode, ['a:gradFill'])
-    if (gradFillNode) {
-      const gsLst = getTextByPathList(gradFillNode, ['a:gsLst', 'a:gs'])
-      if (gsLst) {
-        const gsArr = Array.isArray(gsLst) ? gsLst : [gsLst]
-        const colors = gsArr.map(gs => {
-          const pos = getTextByPathList(gs, ['attrs', 'pos'])
-          let color = ''
-          const srgbClr = getTextByPathList(gs, ['a:srgbClr', 'attrs', 'val'])
-          if (srgbClr) {
-            color = `#${srgbClr}`
-          }
-          else {
-            const schemeClr = 'a:' + getTextByPathList(gs, ['a:schemeClr', 'attrs', 'val'])
-            const resolved = getSchemeColorFromTheme(schemeClr, warpObj)
-            if (resolved) color = `#${resolved}`
-          }
-          if (color) {
-            const clrNode = getTextByPathList(gs, ['a:schemeClr']) || getTextByPathList(gs, ['a:srgbClr'])
-            const alphaVal = getTextByPathList(clrNode, ['a:alpha', 'attrs', 'val'])
-            if (alphaVal) {
-              color = tinycolor(color).setAlpha(parseInt(alphaVal) / 100000).toRgbString()
-            }
-          }
-          return { pos: pos ? (parseInt(pos) / 1000 + '%') : '0%', color }
-        }).filter(c => c.color)
-
-        const linNode = getTextByPathList(gradFillNode, ['a:lin'])
-        let rot = 0
-        if (linNode) rot = angleToDegrees(getTextByPathList(linNode, ['attrs', 'ang'])) + 90
-
-        if (colors.length > 0) {
-          borderColor = { type: 'gradient', value: { colors, rot } }
-        }
-      }
+  if (!borderColor && lineNode['a:gradFill']) {
+    const gradValue = getGradientFill(lineNode['a:gradFill'], warpObj)
+    if (gradValue && gradValue.colors && gradValue.colors.length > 0) {
+      borderColor = { type: 'gradient', value: gradValue }
     }
   }
 
