@@ -190,7 +190,7 @@ function getParagraphSpacingValue(spacingNode) {
   const spcPct = getTextByPathList(spacingNode, ['a:spcPct', 'attrs', 'val'])
   const spcPts = getTextByPathList(spacingNode, ['a:spcPts', 'attrs', 'val'])
 
-  if (spcPct) return parseInt(spcPct) / 1000 + 'em'
+  if (spcPct) return parseInt(spcPct) / 100000 + 'em'
   if (spcPts) return parseInt(spcPts) / 100 + 'pt'
 
   return undefined
@@ -219,5 +219,27 @@ export function getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slid
     }
   }
 
+  const lnSpcReductionVal = getLnSpcReduction(textBodyNode, slideLayoutSpNode, slideMasterSpNode)
+  if (lnSpcReductionVal !== undefined) {
+    const reduction = lnSpcReductionVal / 100000
+    if (spacing.lineSpacing !== undefined) {
+      if (typeof spacing.lineSpacing === 'number') {
+        spacing.lineSpacing = Math.round((spacing.lineSpacing * (1 - reduction)) * 100) / 100
+      }
+    }
+    else {
+      spacing.lineSpacing = Math.round((1 - reduction) * 100) / 100
+    }
+  }
+
   return Object.keys(spacing).length > 0 ? spacing : null
+}
+
+function getLnSpcReduction(textBodyNode, slideLayoutSpNode, slideMasterSpNode) {
+  const sources = [textBodyNode, slideLayoutSpNode && slideLayoutSpNode['p:txBody'], slideMasterSpNode && slideMasterSpNode['p:txBody']]
+  for (const src of sources) {
+    const val = getTextByPathList(src, ['a:bodyPr', 'a:normAutofit', 'attrs', 'lnSpcReduction'])
+    if (val !== undefined) return parseInt(val)
+  }
+  return undefined
 }

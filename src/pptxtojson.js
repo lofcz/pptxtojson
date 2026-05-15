@@ -797,7 +797,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   let content = ''
   if (node['p:txBody']) content = genTextBody(node['p:txBody'], node, slideLayoutSpNode, slideMasterSpNode, type, warpObj)
 
-  const { borderColor, borderWidth, borderType, strokeDasharray } = getBorder(node, type, warpObj)
+  const { borderColor, borderWidth, borderType, strokeDasharray, lineHead, lineTail } = getBorder(node, type, warpObj)
   const fill = await getShapeFill(node, warpObj, source, groupHierarchy)
 
   let shadow
@@ -855,13 +855,16 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
 
   if (shapType && (type === 'obj' || !type || shapType !== 'rect')) {
     if (!isHasValidText) data.content = ''
-    return {
+    const shapeResult = {
       ...data,
       type: 'shape',
       shapType,
       path: shapePath,
       keypoints,
     }
+    if (lineHead) shapeResult.lineHead = lineHead
+    if (lineTail) shapeResult.lineTail = lineTail
+    return shapeResult
   }
   if (shapType && !isHasValidText && (fill || borderWidth)) {
     return {

@@ -782,8 +782,11 @@ export async function getShapeFill(node, warpObj, source, groupHierarchy = []) {
   }
   if (!fillValue) {
     const clrName = getTextByPathList(node, ['p:style', 'a:fillRef'])
-    fillValue = getSolidFill(clrName, undefined, undefined, warpObj)
-    type = 'color'
+    const fillRefIdx = getTextByPathList(clrName, ['attrs', 'idx'])
+    if (clrName && fillRefIdx !== '0') {
+      fillValue = getSolidFill(clrName, undefined, undefined, warpObj)
+      type = 'color'
+    }
   }
   if (!fillValue) {
     return null

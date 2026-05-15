@@ -98,5 +98,19 @@ export function getBorder(node, elType, warpObj) {
     borderWidth,
     borderType,
     strokeDasharray,
+    lineHead: getLineEnd(lineNode, 'a:headEnd'),
+    lineTail: getLineEnd(lineNode, 'a:tailEnd'),
+  }
+}
+
+function getLineEnd(lineNode, tag) {
+  const endNode = getTextByPathList(lineNode, [tag, 'attrs'])
+  if (!endNode) return null
+  const type = endNode['type'] || 'none'
+  if (type === 'none') return null
+  return {
+    type,
+    w: endNode['w'] || 'med',
+    len: endNode['len'] || 'med',
   }
 }
