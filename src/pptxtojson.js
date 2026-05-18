@@ -783,11 +783,6 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
 
   const isFlipV = getTextByPathList(slideXfrmNode, ['attrs', 'flipV']) === '1' || getTextByPathList(slideXfrmNode, ['attrs', 'flipV']) === 'true'
   const isFlipH = getTextByPathList(slideXfrmNode, ['attrs', 'flipH']) === '1' || getTextByPathList(slideXfrmNode, ['attrs', 'flipH']) === 'true'
-  
-  const txBoxVal = getTextByPathList(node, ['p:nvSpPr', 'p:cNvSpPr', 'attrs', 'txBox'])
-  const isTextBox = txBoxVal === '1'
-  const finalIsFlipV = isTextBox ? false : isFlipV
-  const finalIsFlipH = isTextBox ? false : isFlipH
 
   const rotate = angleToDegrees(getTextByPathList(slideXfrmNode, ['attrs', 'rot']))
 
@@ -825,8 +820,8 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
     borderStrokeDasharray: strokeDasharray,
     fill,
     content,
-    isFlipV: finalIsFlipV,
-    isFlipH: finalIsFlipH,
+    isFlipV,
+    isFlipH,
     rotate,
     vAlign,
     name,
@@ -869,10 +864,6 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
     }
     if (lineHead) shapeResult.lineHead = lineHead
     if (lineTail) shapeResult.lineTail = lineTail
-    if (isHasValidText) {
-      shapeResult.isFlipV = false
-      shapeResult.isFlipH = false
-    }
     return shapeResult
   }
   if (shapType && !isHasValidText && (fill || borderWidth)) {

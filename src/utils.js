@@ -152,7 +152,7 @@ export function toHex(n) {
 
 export function hasValidText(htmlString) {
   if (typeof DOMParser === 'undefined') {
-    const text = htmlString.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ')
+    const text = htmlString.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '\u00a0').replace(/\s+/g, ' ')
     return text.trim() !== ''
   }
 
