@@ -28,7 +28,23 @@ export async function parse(file, options = {}) {
     videoMode: options.videoMode || 'none',
     audioMode: options.audioMode || 'none',
   }
-  
+
+  // 检测是否为加密文件（OLE2/CFB 格式，魔数为 D0 CF 11 E0）
+  let fileBytes
+  if (file instanceof ArrayBuffer) {
+    fileBytes = new Uint8Array(file)
+  }
+  else if (typeof File !== 'undefined' && file instanceof File) {
+    const buf = await file.arrayBuffer()
+    fileBytes = new Uint8Array(buf)
+  }
+  else if (typeof Buffer !== 'undefined' && Buffer.isBuffer(file)) {
+    fileBytes = new Uint8Array(file)
+  }
+  if (fileBytes && fileBytes[0] === 0xD0 && fileBytes[1] === 0xCF && fileBytes[2] === 0x11 && fileBytes[3] === 0xE0) {
+    throw new Error('ENCRYPTED_FILE')
+  }
+
   const zip = await JSZip.loadAsync(file)
 
   const filesInfo = await getContentTypes(zip)
@@ -38,7 +54,7 @@ export async function parse(file, options = {}) {
 
   for (const filename of filesInfo.slides) {
     const singleSlide = await processSingleSlide(zip, filename, themeContent, defaultTextStyle, loadedImages, loadedVideos, loadedAudios, parseOptions)
-    slides.push(singleSlide)
+    if (singleSlide) slides.push(singleSlide)
   }
 
   return {
@@ -171,6 +187,7 @@ async function getTheme(zip) {
 async function processSingleSlide(zip, sldFileName, themeContent, defaultTextStyle, loadedImages, loadedVideos, loadedAudios, options) {
   const resName = sldFileName.replace('slides/slide', 'slides/_rels/slide') + '.rels'
   const resContent = await readXmlFile(zip, resName)
+  if (!resContent) return null
   let relationshipArray = resContent['Relationships']['Relationship']
   if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
   
@@ -235,24 +252,27 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const slideLayoutTables = await indexNodes(slideLayoutContent)
   const slideLayoutResFilename = layoutFilename.replace('slideLayouts/slideLayout', 'slideLayouts/_rels/slideLayout') + '.rels'
   const slideLayoutResContent = await readXmlFile(zip, slideLayoutResFilename)
-  relationshipArray = slideLayoutResContent['Relationships']['Relationship']
-  if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
+  if (slideLayoutResContent) {
+    relationshipArray = slideLayoutResContent['Relationships']['Relationship']
+    if (relationshipArray) {
+      if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
+      for (const relationshipArrayItem of relationshipArray) {
+        const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
+        let relTarget = relationshipArrayItem['attrs']['Target']
+        if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+        else relTarget = 'ppt/slideLayouts/' + relTarget
 
-  for (const relationshipArrayItem of relationshipArray) {
-    const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
-    let relTarget = relationshipArrayItem['attrs']['Target']
-    if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
-    else relTarget = 'ppt/slideLayouts/' + relTarget
-
-    switch (relationshipArrayItem['attrs']['Type']) {
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster':
-        masterFilename = relTarget
-        break
-      default:
-        layoutResObj[relationshipArrayItem['attrs']['Id']] = {
-          type: relType,
-          target: relTarget,
+        switch (relationshipArrayItem['attrs']['Type']) {
+          case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster':
+            masterFilename = relTarget
+            break
+          default:
+            layoutResObj[relationshipArrayItem['attrs']['Id']] = {
+              type: relType,
+              target: relTarget,
+            }
         }
+      }
     }
   }
 
@@ -261,24 +281,27 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const slideMasterTables = indexNodes(slideMasterContent)
   const slideMasterResFilename = masterFilename.replace('slideMasters/slideMaster', 'slideMasters/_rels/slideMaster') + '.rels'
   const slideMasterResContent = await readXmlFile(zip, slideMasterResFilename)
-  relationshipArray = slideMasterResContent['Relationships']['Relationship']
-  if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
+  if (slideMasterResContent) {
+    relationshipArray = slideMasterResContent['Relationships']['Relationship']
+    if (relationshipArray) {
+      if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
+      for (const relationshipArrayItem of relationshipArray) {
+        const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
+        let relTarget = relationshipArrayItem['attrs']['Target']
+        if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+        else relTarget = 'ppt/slideMasters/' + relTarget
 
-  for (const relationshipArrayItem of relationshipArray) {
-    const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
-    let relTarget = relationshipArrayItem['attrs']['Target']
-    if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
-    else relTarget = 'ppt/slideMasters/' + relTarget
-
-    switch (relationshipArrayItem['attrs']['Type']) {
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme':
-        themeFilename = relTarget
-        break
-      default:
-        masterResObj[relationshipArrayItem['attrs']['Id']] = {
-          type: relType,
-          target: relTarget,
+        switch (relationshipArrayItem['attrs']['Type']) {
+          case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme':
+            themeFilename = relTarget
+            break
+          default:
+            masterResObj[relationshipArrayItem['attrs']['Id']] = {
+              type: relType,
+              target: relTarget,
+            }
         }
+      }
     }
   }
 
@@ -304,6 +327,7 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const tableStyles = await readXmlFile(zip, 'ppt/tableStyles.xml')
 
   const slideContent = await readXmlFile(zip, sldFileName)
+  if (!slideContent) return null
   const nodes = slideContent['p:sld']['p:cSld']['p:spTree']
   const warpObj = {
     zip,
@@ -509,8 +533,10 @@ async function getLayoutElements(warpObj) {
 }
 
 function indexNodes(content) {
+  if (!content) return { idTable: {}, idxTable: {}, typeTable: {} }
   const keys = Object.keys(content)
-  const spTreeNode = content[keys[0]]['p:cSld']['p:spTree']
+  const spTreeNode = content[keys[0]]?.['p:cSld']?.['p:spTree']
+  if (!spTreeNode) return { idTable: {}, idxTable: {}, typeTable: {} }
   const idTable = {}
   const idxTable = {}
   const typeTable = {}
@@ -836,10 +862,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   const isHasValidText = data.content && hasValidText(data.content)
 
   if (custShapType && type !== 'diagram') {
-    const ext = getTextByPathList(slideXfrmNode, ['a:ext', 'attrs'])
-    const w = parseInt(ext['cx']) * RATIO_EMUs_Points
-    const h = parseInt(ext['cy']) * RATIO_EMUs_Points
-    const d = getCustomShapePath(custShapType, w, h)
+    const d = getCustomShapePath(custShapType, width, height)
     if (!isHasValidText) data.content = ''
 
     return {

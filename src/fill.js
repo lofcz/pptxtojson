@@ -73,7 +73,9 @@ async function loadMedia(filePath, warpObj, cacheKey, mode = 'base64') {
   const fileExt = normalizedPath.split('.').pop().toLowerCase()
   if (fileExt === 'xml') return ''
 
-  const arrayBuffer = await warpObj['zip'].file(normalizedPath).async('arraybuffer')
+  const zipFile = warpObj['zip'].file(normalizedPath)
+  if (!zipFile) return ''
+  const arrayBuffer = await zipFile.async('arraybuffer')
   const mimeType = getMimeType(fileExt)
 
   if (mode === 'base64') {
@@ -318,6 +320,7 @@ export async function getBgPicFill(bgPr, sorce, warpObj) {
 }
 
 export function getGradientFill(node, warpObj) {
+  if (!node['a:gsLst']) return null
   const gsLst = node['a:gsLst']['a:gs']
   const colors = []
   for (let i = 0; i < gsLst.length; i++) {

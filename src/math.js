@@ -34,9 +34,14 @@ export function parseRadical(radical) {
   return degree ? `\\sqrt[${degree}]{${expression}}` : `\\sqrt{${expression}}`
 }
 export function parseMatrix(matrix) {
-  const rows = matrix['m:mr']
+  let rows = matrix['m:mr']
+  if (!rows) return ''
+  if (!Array.isArray(rows)) rows = [rows]
   const matrixRows = rows.map((row) => {
-    return row['m:e'].map((element) => parseOMath(element)).join(' & ')
+    let cells = row['m:e']
+    if (!cells) return ''
+    if (!Array.isArray(cells)) cells = [cells]
+    return cells.map((element) => parseOMath(element)).join(' & ')
   })
   return `\\begin{matrix} ${matrixRows.join(' \\\\ ')} \\end{matrix}`
 }
@@ -77,8 +82,10 @@ export function parseGroupChr(groupChr) {
   return `${chr}${e}${chr}`
 }
 export function parseEqArr(eqArr) {
-  const equations = eqArr['m:e'].map((eq) => parseOMath(eq)).join(' \\\\ ')
-  return `\\begin{cases} ${equations} \\end{cases}`
+  let equations = eqArr['m:e']
+  if (!equations) return ''
+  if (!Array.isArray(equations)) equations = [equations]
+  return `\\begin{cases} ${equations.map((eq) => parseOMath(eq)).join(' \\\\ ')} \\end{cases}`
 }
 export function parseBar(bar) {
   const e = parseOMath(bar['m:e'])
