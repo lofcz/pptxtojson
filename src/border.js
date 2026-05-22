@@ -16,6 +16,7 @@ export function getBorder(node, elType, warpObj) {
   const hasFill = lineNode['a:solidFill'] || lineNode['a:gradFill']
   const hasWidth = getTextByPathList(lineNode, ['attrs', 'w']) !== undefined
 
+  // 正常解析边框宽度
   let borderWidth = isNoFill ? 0 : (parseInt(getTextByPathList(lineNode, ['attrs', 'w'])) / 12700)
   if (isNaN(borderWidth)) {
     const hasLineNode = lineNode && lineNode !== node
@@ -44,7 +45,10 @@ export function getBorder(node, elType, warpObj) {
     }
   }
 
-  if (!borderColor) borderColor = { type: 'color', value: '#000000' }
+  // 默认边框颜色为透明
+  if (!borderColor) {
+    borderColor = { type: 'color', value: 'transparent' }
+  }
 
   const type = getTextByPathList(lineNode, ['a:prstDash', 'attrs', 'val'])
   let borderType = 'solid'
