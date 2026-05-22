@@ -9,6 +9,7 @@ import { getPosition, getSize } from './position'
 import { genTextBody, getTextNodeValue } from './text'
 import { getCustomShapePath, identifyShape } from './shape'
 import { extractFileExtension, getTextByPathList, angleToDegrees, isVideoLink, escapeHtml, hasValidText, numberToFixed } from './utils'
+import { getFontData, getFontFallback } from './font'
 import { getShadow } from './shadow'
 import { getTableBorders, getTableCellParams, getTableRowParams } from './table'
 import { RATIO_EMUs_Points } from './constants'
@@ -108,9 +109,54 @@ async function getUsedFonts(zip) {
   if (!embeddedFontList) return usedFonts
 
   const embeddedFonts = embeddedFontList.constructor === Array ? embeddedFontList : [embeddedFontList]
+
+  // 读取 presentation.xml.rels，获取字体文件路径
+  const relsContent = await readXmlFile(zip, 'ppt/_rels/presentation.xml.rels')
+  const relsMap = {}
+  if (relsContent) {
+    let relItems = getTextByPathList(relsContent, ['Relationships', 'Relationship'])
+    if (relItems) {
+      if (relItems.constructor !== Array) relItems = [relItems]
+      for (const rel of relItems) {
+        const id = getTextByPathList(rel, ['attrs', 'Id'])
+        const target = getTextByPathList(rel, ['attrs', 'Target'])
+        if (id && target) relsMap[id] = target
+      }
+    }
+  }
+
+  const FONT_VARIANTS = ['p:regular', 'p:bold', 'p:italic', 'p:boldItalic']
+
   for (const embeddedFont of embeddedFonts) {
     const typeface = getTextByPathList(embeddedFont, ['p:font', 'attrs', 'typeface'])
-    if (typeface && !usedFonts.includes(typeface)) usedFonts.push(typeface)
+    if (!typeface) continue
+
+    let fontBlob = ''
+    for (const variant of FONT_VARIANTS) {
+      const variantNode = embeddedFont[variant]
+      if (!variantNode) continue
+      const rid = getTextByPathList(variantNode, ['attrs', 'r:id'])
+      if (!rid) continue
+      const relTarget = relsMap[rid]
+      if (!relTarget) continue
+
+      let fontPath = relTarget
+      if (fontPath.startsWith('../')) {
+        fontPath = fontPath.substring(3)
+      }
+      else {
+        fontPath = 'ppt/' + fontPath
+      }
+
+      fontBlob = await getFontData(zip, fontPath)
+      if (fontBlob) break
+    }
+
+    usedFonts.push({
+      name: typeface,
+      fontFamily: getFontFallback(typeface),
+      blob: fontBlob,
+    })
   }
 
   return usedFonts
