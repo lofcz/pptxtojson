@@ -745,7 +745,8 @@ export async function getSlideBackgroundFill(warpObj) {
 }
 
 export async function getShapeFill(node, warpObj, source, groupHierarchy = []) {
-  const fillType = getFillType(getTextByPathList(node, ['p:spPr']))
+  const spPr = getTextByPathList(node, ['p:spPr'])
+  const fillType = getFillType(spPr)
   let type = 'color'
   let fillValue = ''
   if (fillType === 'NO_FILL') {
@@ -784,6 +785,11 @@ export async function getShapeFill(node, warpObj, source, groupHierarchy = []) {
     return findFillInGroupHierarchy(groupHierarchy, warpObj, source)
   }
   if (!fillValue) {
+    // 如果形状设置了 useBgFill="1"，则直接使用幻灯片背景填充
+    const useBgFill = getTextByPathList(node, ['attrs', 'useBgFill'])
+    if (useBgFill === '1' || useBgFill === 'true') {
+      return await getSlideBackgroundFill(warpObj)
+    }
     const clrName = getTextByPathList(node, ['p:style', 'a:fillRef'])
     const fillRefIdx = getTextByPathList(clrName, ['attrs', 'idx'])
     if (clrName && fillRefIdx !== '0') {
@@ -856,9 +862,15 @@ async function findFillInGroupHierarchy(groupHierarchy, warpObj, source) {
         }
       }
     }
+    else if (fillType === 'GROUP_FILL') {
+      continue
+    }
+    else if (fillType === 'NO_FILL') {
+      return null
+    }
   }
 
-  return null
+  return { type: 'slide-background' }
 }
 
 export function getSolidFill(solidFill, clrMap, phClr, warpObj) {

@@ -37,8 +37,8 @@ export function getCustomShapePath(custShapType, w, h) {
 
   if (Array.isArray(pathNodes)) pathNodes = pathNodes.shift()
 
-  const maxX = parseInt(pathNodes['attrs']['w'])
-  const maxY = parseInt(pathNodes['attrs']['h'])
+  const maxX = parseInt(pathNodes['attrs']['w']) || 0
+  const maxY = parseInt(pathNodes['attrs']['h']) || 0
   const cX = maxX === 0 ? 0 : (1 / maxX) * w
   const cY = maxY === 0 ? 0 : (1 / maxY) * h
   let d = ''
