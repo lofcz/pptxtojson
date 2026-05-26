@@ -61,7 +61,10 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
     const align = getHorizontalAlign(pNode, spNode, type, slideLayoutSpNode, slideMasterSpNode, warpObj)
     const spacing = getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
 
-    let styleText = `text-align: ${align};`
+    let alignStyle = align
+    if (align === 'distribute') alignStyle = 'justify'
+    let styleText = `text-align: ${alignStyle};`
+    if (align === 'distribute') styleText += `text-align-last: justify;text-justify: distribute;`
     if (spacing) {
       if (spacing.lineSpacing) styleText += `line-height: ${spacing.lineSpacing};`
       if (spacing.spaceBefore) styleText += `margin-top: ${spacing.spaceBefore};`
@@ -189,7 +192,7 @@ export function getSpanStyleInfo(node, pNode, textBodyNode, pFontStyle, slideLay
   let styleText = ''
   const fontColor = getFontColor(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, pFontStyle, warpObj)
   const fontSize = getFontSize(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, defaultTextStyle)
-  const fontType = getFontType(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, warpObj)
+  const fontType = getFontType(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, warpObj, text)
   const fontBold = getFontBold(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
   const fontItalic = getFontItalic(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
   const fontDecoration = getFontDecoration(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)

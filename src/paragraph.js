@@ -58,7 +58,7 @@ export function getHorizontalAlign(node, pNode, type, slideLayoutSpNode, slideMa
         align = 'justify'
         break
       case 'dist':
-        align = 'justify'
+        align = 'distribute'
         break
       default:
         align = 'inherit'
