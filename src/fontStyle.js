@@ -229,6 +229,13 @@ export function getFontColor(
   pFontStyle,
   warpObj
 ) {
+  // run 级别（a:rPr）是最高优先级。如果明确声明了 noFill，
+  // 表示文字颜色为透明，应直接返回 transparent，不再继续向上查找。
+  const runStyleNode = getTextByPathList(node, ['a:rPr'])
+  if (runStyleNode && getFillType(runStyleNode) === 'NO_FILL') {
+    return 'transparent'
+  }
+
   const styleNodes = getBaseFontStyleNodes(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, lvl)
   let color = getFontColorFromStyleNodes(styleNodes, warpObj)
 

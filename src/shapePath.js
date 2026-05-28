@@ -6,7 +6,7 @@ import { getTextByPathList } from './utils'
 function shapePie(H, w, adj1, adj2, isClose) {
   const pieVal = parseFloat(adj2)
   const piAngle = parseFloat(adj1)
-  const size = parseInt(H)
+  const size = parseFloat(H)
   const radiusY = size / 2
   const radiusX = w / 2
   const centerX = radiusX
