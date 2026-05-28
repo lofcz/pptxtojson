@@ -63,7 +63,7 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
 
     let alignStyle = align
     if (align === 'distribute') alignStyle = 'justify'
-    let styleText = `text-align: ${alignStyle};`
+    let styleText = `text-align: ${alignStyle};line-height: 1.2;`
     if (align === 'distribute') styleText += `text-align-last: justify;text-justify: distribute;`
     if (spacing) {
       if (spacing.lineSpacing) styleText += `line-height: ${spacing.lineSpacing};`
@@ -92,8 +92,10 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
       const firstRNode = rNode ? rNode[0] : pNode
       const liLevel = listLevel + 1
       const liFontSize = getFontSize(firstRNode, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, liLevel, defaultTextStyle)
+      const liFontColor = getFontColor(firstRNode, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, liLevel, pFontStyle, warpObj)
       let liStyleText = styleText
       if (liFontSize) liStyleText += `font-size: ${liFontSize};`
+      if (liFontColor && typeof liFontColor === 'string') liStyleText += `color: ${liFontColor};`
       text += `<li style="${liStyleText}">`
     }
     else {
@@ -153,6 +155,11 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
 export function getListType(node) {
   const pPrNode = node['a:pPr']
   if (!pPrNode) return ''
+
+  if (pPrNode['a:buNone']) return ''
+
+  const hasContent = node['a:r'] || node['a:br'] || node['a:fld']
+  if (!hasContent) return ''
 
   if (pPrNode['a:buChar']) return 'ul'
   if (pPrNode['a:buAutoNum']) return 'ol'

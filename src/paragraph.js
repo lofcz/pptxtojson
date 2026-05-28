@@ -84,7 +84,11 @@ export function getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode) {
     if (!bodyPr) return null
 
     if (bodyPr['a:noAutofit']) return { result: null }
-    else if (bodyPr['a:spAutoFit']) return { result: { type: 'shape' } }
+    else if (bodyPr['a:spAutoFit']) {
+      const wrap = getTextByPathList(bodyPr, ['attrs', 'wrap'])
+      const wrapText = wrap !== 'none'
+      return { result: { type: 'shape', wrapText } }
+    }
     else if (bodyPr['a:normAutofit']) {
       const fontScale = getTextByPathList(bodyPr['a:normAutofit'], ['attrs', 'fontScale'])
       if (fontScale) {
@@ -180,7 +184,7 @@ function getLineSpacingValue(spacingNode) {
   const spcPct = getTextByPathList(spacingNode, ['a:spcPct', 'attrs', 'val'])
   const spcPts = getTextByPathList(spacingNode, ['a:spcPts', 'attrs', 'val'])
 
-  if (spcPct) return parseInt(spcPct) / 1000 / 100
+  if (spcPct) return Math.round(parseInt(spcPct) / 1000 / 100 * 1.2 * 100) / 100
   if (spcPts) return parseInt(spcPts) / 100 + 'pt'
 
   return undefined

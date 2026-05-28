@@ -511,7 +511,7 @@ export async function getSlideBackgroundFill(warpObj) {
       const bgFillTyp = getFillType(bgFillLstIdx)
       if (bgFillTyp === 'SOLID_FILL') {
         const sldFill = bgFillLstIdx['a:solidFill']
-        const sldBgClr = getSolidFill(sldFill, clrMapOvr, undefined, warpObj)
+        const sldBgClr = getSolidFill(sldFill, clrMapOvr, phClr, warpObj)
         background = sldBgClr
       } 
       else if (bgFillTyp === 'GRADIENT_FILL') {
@@ -607,7 +607,7 @@ export async function getSlideBackgroundFill(warpObj) {
         const bgFillTyp = getFillType(bgFillLstIdx)
         if (bgFillTyp === 'SOLID_FILL') {
           const sldFill = bgFillLstIdx['a:solidFill']
-          const sldBgClr = getSolidFill(sldFill, clrMapOvr, undefined, warpObj)
+          const sldBgClr = getSolidFill(sldFill, clrMapOvr, phClr, warpObj)
           background = sldBgClr
         }
         else if (bgFillTyp === 'GRADIENT_FILL') {
@@ -710,7 +710,7 @@ export async function getSlideBackgroundFill(warpObj) {
           const bgFillTyp = getFillType(bgFillLstIdx)
           if (bgFillTyp === 'SOLID_FILL') {
             const sldFill = bgFillLstIdx['a:solidFill']
-            const sldBgClr = getSolidFill(sldFill, clrMapOvr, undefined, warpObj)
+            const sldBgClr = getSolidFill(sldFill, clrMapOvr, phClr, warpObj)
             background = sldBgClr
           }
           else if (bgFillTyp === 'GRADIENT_FILL') {

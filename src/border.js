@@ -2,9 +2,10 @@ import { getSolidFill, getGradientFill } from './fill'
 import { getTextByPathList } from './utils'
 
 export function getBorder(node, elType, warpObj) {
-  let lineNode = getTextByPathList(node, ['p:spPr', 'a:ln'])
+  const spPrLineNode = getTextByPathList(node, ['p:spPr', 'a:ln'])
+  const lnRefNode = getTextByPathList(node, ['p:style', 'a:lnRef'])
+  let lineNode = spPrLineNode
   if (!lineNode) {
-    const lnRefNode = getTextByPathList(node, ['p:style', 'a:lnRef'])
     if (lnRefNode) {
       const lnIdx = getTextByPathList(lnRefNode, ['attrs', 'idx'])
       lineNode = warpObj['themeContent']['a:theme']['a:themeElements']['a:fmtScheme']['a:lnStyleLst']['a:ln'][Number(lnIdx) - 1]
@@ -30,10 +31,10 @@ export function getBorder(node, elType, warpObj) {
     if (color) borderColor = { type: 'color', value: color }
   }
 
-  if (!borderColor) {
-    const lnRefFill = getTextByPathList(node, ['p:style', 'a:lnRef'])
-    if (lnRefFill) {
-      const color = getSolidFill(lnRefFill, undefined, undefined, warpObj)
+  // 仅当形状本身没有定义 a:ln（使用 lnRef 主题样式）时，才从 lnRef 取颜色
+  if (!borderColor && !spPrLineNode) {
+    if (lnRefNode) {
+      const color = getSolidFill(lnRefNode, undefined, undefined, warpObj)
       if (color) borderColor = { type: 'color', value: color }
     }
   }
