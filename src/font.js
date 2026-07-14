@@ -53,7 +53,8 @@ function convertEOTtoTTF(eotBuffer) {
     }
 
     return ttfBytes
-  } catch (e) {
+  }
+  catch (e) {
     return null
   }
 }
@@ -81,15 +82,14 @@ export async function getFontData(zip, fontPath) {
     // 将 EOT 转换为 TTF
     const ttfBytes = convertEOTtoTTF(buffer)
     if (!ttfBytes) {
-      console.warn('Failed to convert EOT to TTF:', fontFilename)
       return ''
     }
 
     const mimeType = 'font/ttf'
     const blobObj = new Blob([ttfBytes], { type: mimeType })
     return URL.createObjectURL(blobObj)
-  } catch (e) {
-    console.error('Error loading font:', fontPath, e)
+  }
+  catch (e) {
     return ''
   }
 }

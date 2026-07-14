@@ -35,9 +35,11 @@ function appendMasterTextStyleNodes(styleNodes, type, lvl, slideMasterTextStyles
     if (type === 'subTitle') {
       pushStyleNode(styleNodes, getTextByPathList(slideMasterTextStyles, ['p:bodyStyle', lvlPath, 'a:defRPr']))
     }
-  } else if (type === 'body') {
+  }
+  else if (type === 'body') {
     pushStyleNode(styleNodes, getTextByPathList(slideMasterTextStyles, ['p:bodyStyle', lvlPath, 'a:defRPr']))
-  } else {
+  }
+  else {
     pushStyleNode(styleNodes, getTextByPathList(slideMasterTextStyles, ['p:otherStyle', lvlPath, 'a:defRPr']))
   }
 }
@@ -206,7 +208,8 @@ export function getFontType(
         (isEA ? getTextByPathList(fontSchemeNode, ['a:majorFont', 'a:ea', 'attrs', 'typeface']) : '') ||
         getTextByPathList(fontSchemeNode, ['a:majorFont', 'a:latin', 'attrs', 'typeface']) ||
         getTextByPathList(fontSchemeNode, ['a:majorFont', 'a:ea', 'attrs', 'typeface'])
-    } else {
+    }
+    else {
       typeface =
         (isEA ? getTextByPathList(fontSchemeNode, ['a:minorFont', 'a:ea', 'attrs', 'typeface']) : '') ||
         getTextByPathList(fontSchemeNode, ['a:minorFont', 'a:latin', 'attrs', 'typeface']) ||

@@ -55,6 +55,7 @@ export function getCustomShapePath(custShapType, w, h) {
   const multiSapeAry = []
   if (moveToNode.length > 0) {
     Object.keys(moveToNode).forEach(key => {
+      if (!moveToNode[key]) return
       const moveToPtNode = moveToNode[key]['a:pt']
       if (moveToPtNode) {
         Object.keys(moveToPtNode).forEach(key => {
@@ -74,6 +75,7 @@ export function getCustomShapePath(custShapType, w, h) {
     if (lnToNodes) {
       if (!Array.isArray(lnToNodes)) lnToNodes = [lnToNodes]
       Object.keys(lnToNodes).forEach(key => {
+        if (!lnToNodes[key]) return
         const lnToPtNode = lnToNodes[key]['a:pt']
         if (lnToPtNode) {
           Object.keys(lnToPtNode).forEach(key => {
@@ -95,6 +97,7 @@ export function getCustomShapePath(custShapType, w, h) {
       const cubicBezToPtNodesAry = []
       if (!Array.isArray(cubicBezToNodes)) cubicBezToNodes = [cubicBezToNodes]
       Object.keys(cubicBezToNodes).forEach(key => {
+        if (!cubicBezToNodes[key] || !cubicBezToNodes[key]['a:pt']) return
         cubicBezToPtNodesAry.push(cubicBezToNodes[key]['a:pt'])
       })
 
@@ -119,6 +122,7 @@ export function getCustomShapePath(custShapType, w, h) {
       const quadBezToPtNodesAry = []
       if (!Array.isArray(quadBezToNodes)) quadBezToNodes = [quadBezToNodes]
       Object.keys(quadBezToNodes).forEach(key => {
+        if (!quadBezToNodes[key] || !quadBezToNodes[key]['a:pt']) return
         quadBezToPtNodesAry.push(quadBezToNodes[key]['a:pt'])
       })
 
