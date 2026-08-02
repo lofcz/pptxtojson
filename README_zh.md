@@ -191,6 +191,7 @@ func()
 		- 方向 `direction`
 
 	- 页面内元素 `elements` / 母版元素 `layoutElements`
+		- OOXML ID `id`
 		- 文字
 			- 类型 `type='text'`
 			- 水平坐标 `left`
@@ -210,6 +211,7 @@ func()
 			- 水平翻转 `isFlipH`
 			- 旋转角度 `rotate`
 			- 垂直对齐方向 `vAlign`
+			- 是否自动换行 `wrap`
 			- 是否为竖向文本 `isVertical`
 			- 元素名 `name`
 			- 自动调整大小 `autoFit`
@@ -258,6 +260,7 @@ func()
 			- 旋转角度 `rotate`
 			- 形状类型 `shapType`
 			- 垂直对齐方向 `vAlign`
+			- 是否自动换行 `wrap`
 			- 形状路径 `path`
 			- 形状路径 viewBox `pathViewBox`
 			- 线条起点端点样式 `headEnd`

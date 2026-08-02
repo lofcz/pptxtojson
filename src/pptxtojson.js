@@ -574,6 +574,19 @@ async function processNodesInSlide(nodeKey, nodeValue, warpObj, source, groupHie
     default:
   }
 
+  if (json && typeof json === 'object' && !json.id) {
+    const id = getTextByPathList(nodeValue, ['p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['p:nvPicPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['p:nvCxnSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['p:nvGrpSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['p:nvGraphicFramePr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['mc:Choice', 'p:sp', 'p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['mc:Fallback', 'p:sp', 'p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['mc:Fallback', 'p:nvGrpSpPr', 'p:cNvPr', 'attrs', 'id'])
+
+    json.id = id || ''
+  }
+
   return json
 }
 
@@ -824,6 +837,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
 
   const vAlign = getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode, type)
   const isVertical = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'vert']) === 'eaVert'
+  const wrap = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'wrap']) !== 'none'
   const autoFit = getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode)
   const textInset = getTextInsets(node, slideLayoutSpNode, slideMasterSpNode)
 
@@ -842,6 +856,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
     isFlipH,
     rotate,
     vAlign,
+    wrap,
     name,
     order,
   }
