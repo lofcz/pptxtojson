@@ -129,7 +129,12 @@ async function getTheme(zip) {
     themeURI = relationshipArray['attrs']['Target']
   }
 
-  const themeContent = await readXmlFile(zip, 'ppt/' + themeURI)
+  let themeContent = null
+  if (themeURI) {
+    themeURI = themeURI.replace(/\\/g, '/')
+    const themeFilename = themeURI.indexOf('/ppt/') === 0 ? themeURI.substr(1) : 'ppt/' + themeURI
+    themeContent = await readXmlFile(zip, themeFilename)
+  }
 
   const themeColors = []
   const clrScheme = getTextByPathList(themeContent, ['a:theme', 'a:themeElements', 'a:clrScheme'])
@@ -173,7 +178,9 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     let relTarget = relationshipArrayItem['attrs']['Target']
     const isExternal = relationshipArrayItem['attrs']['TargetMode'] === 'External'
     if (!isExternal) {
-      if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+      relTarget = relTarget.replace(/\\/g, '/')
+      if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+      else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
       else relTarget = 'ppt/slides/' + relTarget
     }
 
@@ -226,7 +233,9 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   for (const relationshipArrayItem of relationshipArray) {
     const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
     let relTarget = relationshipArrayItem['attrs']['Target']
-    if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+    relTarget = relTarget.replace(/\\/g, '/')
+    if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+    else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
     else relTarget = 'ppt/slideLayouts/' + relTarget
 
     switch (relationshipArrayItem['attrs']['Type']) {
@@ -252,7 +261,9 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   for (const relationshipArrayItem of relationshipArray) {
     const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
     let relTarget = relationshipArrayItem['attrs']['Target']
-    if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+    relTarget = relTarget.replace(/\\/g, '/')
+    if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+    else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
     else relTarget = 'ppt/slideMasters/' + relTarget
 
     switch (relationshipArrayItem['attrs']['Type']) {
@@ -278,9 +289,14 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
       if (relationshipArray) {
         if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
         for (const relationshipArrayItem of relationshipArray) {
+          let relTarget = relationshipArrayItem['attrs']['Target']
+          relTarget = relTarget.replace(/\\/g, '/')
+          if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+          else relTarget = relTarget.replace('../', 'ppt/')
+
           themeResObj[relationshipArrayItem['attrs']['Id']] = {
             'type': relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', ''),
-            'target': relationshipArrayItem['attrs']['Target'].replace('../', 'ppt/')
+            'target': relTarget
           }
         }
       }
