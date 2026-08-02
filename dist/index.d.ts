@@ -76,6 +76,7 @@ export interface LineEnd {
 
 export interface Shape {
   type: 'shape'
+  id: string
   left: number
   top: number
   width: number
@@ -92,6 +93,7 @@ export interface Shape {
   rotate: number
   shapType: string
   vAlign: string
+  wrap: boolean
   path?: string
   pathViewBox?: PathViewBox
   headEnd?: LineEnd
@@ -107,6 +109,7 @@ export interface Shape {
 
 export interface Text {
   type: 'text'
+  id: string
   left: number
   top: number
   width: number
@@ -123,6 +126,7 @@ export interface Text {
   rotate: number
   content: string
   vAlign: string
+  wrap: boolean
   name: string
   order: number
   autoFit?: AutoFit
@@ -132,6 +136,7 @@ export interface Text {
 
 export interface Image {
   type: 'image'
+  id: string
   left: number
   top: number
   width: number
@@ -183,6 +188,7 @@ export interface TableCell {
 }
 export interface Table {
   type: 'table'
+  id: string
   left: number
   top: number
   width: number
@@ -230,6 +236,7 @@ export interface ChartItem {
 export type ScatterChartData = number[][]
 export interface CommonChart {
   type: 'chart'
+  id: string
   left: number
   top: number
   width: number
@@ -246,6 +253,7 @@ export interface CommonChart {
 }
 export interface ScatterChart {
   type: 'chart'
+  id: string
   left: number
   top: number
   width: number
@@ -259,6 +267,7 @@ export type Chart = CommonChart | ScatterChart
 
 export interface Video {
   type: 'video'
+  id: string
   left: number
   top: number
   width: number
@@ -270,6 +279,7 @@ export interface Video {
 
 export interface Audio {
   type: 'audio'
+  id: string
   left: number
   top: number
   width: number
@@ -281,6 +291,7 @@ export interface Audio {
 
 export interface Diagram {
   type: 'diagram'
+  id: string
   left: number
   top: number
   width: number
@@ -292,6 +303,7 @@ export interface Diagram {
 
 export interface Math {
   type: 'math'
+  id: string
   left: number
   top: number
   width: number
@@ -308,6 +320,7 @@ export type BaseElement = Shape | Text | Image | Table | Chart | Video | Audio |
 
 export interface Group {
   type: 'group'
+  id: string
   left: number
   top: number
   width: number

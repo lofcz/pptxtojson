@@ -191,6 +191,7 @@ All numeric length values in the output JSON use `pt` (point) as the unit.
 		- Direction `direction`
 
 	- Slide elements `elements` / master layout elements `layoutElements`
+		- OOXML ID `id`
 		- Text
 			- Type `type='text'`
 			- Horizontal coordinate `left`
@@ -210,6 +211,7 @@ All numeric length values in the output JSON use `pt` (point) as the unit.
 			- Horizontal flip `isFlipH`
 			- Rotation angle `rotate`
 			- Vertical alignment `vAlign`
+			- Whether text wraps automatically `wrap`
 			- Whether it is vertical text `isVertical`
 			- Element name `name`
 			- Auto fit `autoFit`
@@ -258,6 +260,7 @@ All numeric length values in the output JSON use `pt` (point) as the unit.
 			- Rotation angle `rotate`
 			- Shape type `shapType`
 			- Vertical alignment `vAlign`
+			- Whether text wraps automatically `wrap`
 			- Shape path `path`
 			- Shape path viewBox `pathViewBox`
 			- Line head endpoint `headEnd`

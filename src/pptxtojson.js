@@ -574,16 +574,17 @@ async function processNodesInSlide(nodeKey, nodeValue, warpObj, source, groupHie
     default:
   }
 
-  // Expose the shape's <p:cNvPr> id. Animations target shapes by it (<p:spTgt spid>), and it is a
-  // stable key for the element that survives round-trips; the container differs per node type, so
-  // it is read here once for every kind rather than in each processor.
   if (json && typeof json === 'object' && !json.id) {
     const id = getTextByPathList(nodeValue, ['p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) ||
       getTextByPathList(nodeValue, ['p:nvPicPr', 'p:cNvPr', 'attrs', 'id']) ||
       getTextByPathList(nodeValue, ['p:nvCxnSpPr', 'p:cNvPr', 'attrs', 'id']) ||
       getTextByPathList(nodeValue, ['p:nvGrpSpPr', 'p:cNvPr', 'attrs', 'id']) ||
-      getTextByPathList(nodeValue, ['p:nvGraphicFramePr', 'p:cNvPr', 'attrs', 'id'])
-    if (id) json.id = id
+      getTextByPathList(nodeValue, ['p:nvGraphicFramePr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['mc:Choice', 'p:sp', 'p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['mc:Fallback', 'p:sp', 'p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['mc:Fallback', 'p:nvGrpSpPr', 'p:cNvPr', 'attrs', 'id'])
+
+    json.id = id || ''
   }
 
   return json
@@ -836,10 +837,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
 
   const vAlign = getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode, type)
   const isVertical = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'vert']) === 'eaVert'
-  // Text wrapping mode. wrap="none" means the run stays on one line and overflows the shape
-  // instead of wrapping at its width; without it every autofit title re-wraps and collides with
-  // the content below.
-  const wrap = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'wrap'])
+  const wrap = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'wrap']) !== 'none'
   const autoFit = getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode)
   const textInset = getTextInsets(node, slideLayoutSpNode, slideMasterSpNode)
 
