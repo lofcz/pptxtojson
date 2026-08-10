@@ -80,6 +80,15 @@ export function getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode) {
   return (anchor === 'ctr') ? 'mid' : ((anchor === 'b') ? 'down' : 'up')
 }
 
+export function getTextDirection(node, slideLayoutSpNode, slideMasterSpNode) {
+  const sources = [node, slideLayoutSpNode, slideMasterSpNode]
+  for (const source of sources) {
+    const direction = getTextByPathList(source, ['p:txBody', 'a:bodyPr', 'attrs', 'vert'])
+    if (direction) return direction
+  }
+  return 'horz'
+}
+
 export function getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode) {
   function checkBodyPr(bodyPr) {
     if (!bodyPr) return null

@@ -3,7 +3,7 @@ import { readXmlFile } from './readXmlFile'
 import { getBorder } from './border'
 import { getSlideBackgroundFill, getShapeFill, getSolidFill, getPicFill, getPicFilters, getPicFillOpacity, getImageData, getVideoData, getAudioData } from './fill'
 import { getChartInfo } from './chart'
-import { getVerticalAlign, getTextAutoFit } from './paragraph'
+import { getVerticalAlign, getTextDirection, getTextAutoFit } from './paragraph'
 import { getTextInsets } from './textInsets'
 import { getPosition, getSize } from './position'
 import { genTextBody, getTextNodeValue } from './text'
@@ -935,7 +935,8 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   if (outerShdwNode) shadow = getShadow(outerShdwNode, warpObj)
 
   const vAlign = getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode, type)
-  const isVertical = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'vert']) === 'eaVert'
+  const textDirection = getTextDirection(node, slideLayoutSpNode, slideMasterSpNode)
+  const isVertical = textDirection !== 'horz'
   const wrap = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'wrap']) !== 'none'
   const autoFit = getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode)
   const textInset = getTextInsets(node, slideLayoutSpNode, slideMasterSpNode)
