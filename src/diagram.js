@@ -69,7 +69,9 @@ export async function getDiagramNodeContext(node, warpObj) {
       if (relationshipArray) {
         for (const relationshipArrayItem of relationshipArray) {
           let relTarget = relationshipArrayItem['attrs']['Target']
-          if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+          relTarget = relTarget.replace(/\\/g, '/')
+          if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+          else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
           else relTarget = drawingTarget.replace(drawingName, '') + relTarget
 
           diagramResObj[relationshipArrayItem['attrs']['Id']] = {

@@ -744,26 +744,47 @@ export async function getSlideBackgroundFill(warpObj) {
   }
 }
 
-export async function getShapeFill(node, warpObj, source, groupHierarchy = []) {
+function getShapeFillCandidates(node, source, slideLayoutSpNode, slideMasterSpNode) {
+  const candidates = [{ node, source }]
+
+  if (slideLayoutSpNode) {
+    candidates.push({
+      node: slideLayoutSpNode,
+      source: 'slideLayoutBg',
+    })
+  }
+  if (slideMasterSpNode) {
+    candidates.push({
+      node: slideMasterSpNode,
+      source: 'slideMasterBg',
+    })
+  }
+
+  return candidates
+}
+
+async function resolveShapeFillFromNode(node, warpObj, source, groupHierarchy) {
+  if (!node) return { state: 'missing' }
+
   const spPr = getTextByPathList(node, ['p:spPr'])
-  const fillType = getFillType(spPr)
+  const fillType = spPr ? getFillType(spPr) : ''
   let type = 'color'
   let fillValue = ''
   if (fillType === 'NO_FILL') {
-    return null
+    return { state: 'none' }
   }
   else if (fillType === 'SOLID_FILL') {
-    const shpFill = node['p:spPr']['a:solidFill']
+    const shpFill = spPr['a:solidFill']
     fillValue = getSolidFill(shpFill, undefined, undefined, warpObj)
     type = 'color'
   }
   else if (fillType === 'GRADIENT_FILL') {
-    const shpFill = node['p:spPr']['a:gradFill']
+    const shpFill = spPr['a:gradFill']
     fillValue = getGradientFill(shpFill, warpObj)
     type = 'gradient'
   }
   else if (fillType === 'PIC_FILL') {
-    const shpFill = node['p:spPr']['a:blipFill']
+    const shpFill = spPr['a:blipFill']
     const picFill = await getPicFill(source, shpFill, warpObj)
     const opacity = getPicFillOpacity(shpFill)
     fillValue = {
@@ -777,12 +798,13 @@ export async function getShapeFill(node, warpObj, source, groupHierarchy = []) {
     type = 'image'
   }
   else if (fillType === 'PATTERN_FILL') {
-    const shpFill = node['p:spPr']['a:pattFill']
+    const shpFill = spPr['a:pattFill']
     fillValue = getPatternFill({ 'a:pattFill': shpFill }, warpObj)
     type = 'pattern'
   }
   else if (fillType === 'GROUP_FILL') {
-    return findFillInGroupHierarchy(groupHierarchy, warpObj, source)
+    const groupFill = await findFillInGroupHierarchy(groupHierarchy, warpObj, source)
+    return groupFill ? { state: 'found', fill: groupFill } : { state: 'none' }
   }
   if (!fillValue) {
     // 如果形状设置了 useBgFill="1"，则直接使用幻灯片背景填充
@@ -798,13 +820,34 @@ export async function getShapeFill(node, warpObj, source, groupHierarchy = []) {
     }
   }
   if (!fillValue) {
-    return null
+    return { state: 'missing' }
   }
 
   return {
-    type,
-    value: fillValue,
+    state: 'found',
+    fill: {
+      type,
+      value: fillValue,
+    }
   }
+}
+
+export async function getShapeFill(node, warpObj, source, options = {}) {
+  const {
+    groupHierarchy = [],
+    slideLayoutSpNode,
+    slideMasterSpNode,
+  } = options
+
+  const candidates = getShapeFillCandidates(node, source, slideLayoutSpNode, slideMasterSpNode)
+  for (const candidate of candidates) {
+    const result = await resolveShapeFillFromNode(candidate.node, warpObj, candidate.source, groupHierarchy)
+
+    if (result.state === 'none') return null
+    if (result.state === 'found') return result.fill
+  }
+
+  return null
 }
 
 async function findFillInGroupHierarchy(groupHierarchy, warpObj, source) {

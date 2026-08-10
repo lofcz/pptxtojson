@@ -432,11 +432,13 @@
             loadingOverlay.classList.add('show')
 
             try {
+              const parseStart = performance.now()
               const json = await pptxtojson.parse(e.target.result, {
                 imageMode: 'blob',
                 videoMode: 'blob',
                 audioMode: 'blob',
               })
+              console.log('parse time:', ((performance.now() - parseStart) / 1000).toFixed(3) + 's')
               editor.set(json)
               console.log(json)
               jsonString = JSON.stringify(json, null, 2)
@@ -459,7 +461,13 @@
         loadingOverlay.classList.add('show')
 
         try {
-          const json = await pptxtojson.parse(file)
+          const parseStart = performance.now()
+          const json = await pptxtojson.parse(file, {
+            imageMode: 'both',
+            videoMode: 'blob',
+            audioMode: 'blob',
+          })
+          console.log('parse time:', ((performance.now() - parseStart) / 1000).toFixed(3) + 's')
           editor.set(json)
           console.log(json)
           jsonString = JSON.stringify(json, null, 2)

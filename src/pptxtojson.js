@@ -7,7 +7,7 @@ import { getVerticalAlign, getTextAutoFit } from './paragraph'
 import { getTextInsets } from './textInsets'
 import { getPosition, getSize } from './position'
 import { genTextBody, getTextNodeValue } from './text'
-import { getCustomShapePath, identifyShape } from './shape'
+import { getCustomShapePath, identifyShape, isStrokeOnlyCustomGeometry } from './shape'
 import { extractFileExtension, getTextByPathList, angleToDegrees, isVideoLink, escapeHtml, hasValidText, numberToFixed } from './utils'
 import { getFontData, getFontFallback } from './font'
 import { getShadow } from './shadow'
@@ -23,6 +23,7 @@ export async function parse(file, options = {}) {
   const loadedImages = {}
   const loadedVideos = {}
   const loadedAudios = {}
+  const xmlCache = {}
   const parseOptions = {
     ...options,
     imageMode: options.imageMode || 'base64',
@@ -54,7 +55,7 @@ export async function parse(file, options = {}) {
   const usedFonts = await getUsedFonts(zip)
 
   for (const filename of filesInfo.slides) {
-    const singleSlide = await processSingleSlide(zip, filename, themeContent, defaultTextStyle, loadedImages, loadedVideos, loadedAudios, parseOptions)
+    const singleSlide = await processSingleSlide(zip, filename, themeContent, defaultTextStyle, loadedImages, loadedVideos, loadedAudios, parseOptions, xmlCache)
     if (singleSlide) slides.push(singleSlide)
   }
 
@@ -194,25 +195,27 @@ async function getTheme(zip) {
 
   if (!themeURI) {
     const masterResContent = await readXmlFile(zip, 'ppt/slideMasters/_rels/slideMaster1.xml.rels')
-    const masterRelationshipArray = masterResContent['Relationships']['Relationship']
-    if (masterRelationshipArray.constructor === Array) {
-      for (const relationshipItem of masterRelationshipArray) {
-        if (relationshipItem['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
-          themeURI = relationshipItem['attrs']['Target']
-          break
+    if (masterResContent) {
+      const masterRelationshipArray = masterResContent['Relationships']['Relationship']
+      if (masterRelationshipArray.constructor === Array) {
+        for (const relationshipItem of masterRelationshipArray) {
+          if (relationshipItem['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
+            themeURI = relationshipItem['attrs']['Target']
+            break
+          }
         }
       }
-    }
-    else if (masterRelationshipArray['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
-      themeURI = masterRelationshipArray['attrs']['Target']
+      else if (masterRelationshipArray['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
+        themeURI = masterRelationshipArray['attrs']['Target']
+      }
     }
   }
 
   if (themeURI) {
-    if (themeURI.startsWith('../')) {
-      themeURI = themeURI.substring(3)
-    }
-    themeContent = await readXmlFile(zip, 'ppt/' + themeURI)
+    themeURI = themeURI.replace(/\\/g, '/')
+    if (themeURI.startsWith('../')) themeURI = themeURI.substring(3)
+    const themeFilename = themeURI.indexOf('/ppt/') === 0 ? themeURI.substr(1) : 'ppt/' + themeURI
+    themeContent = await readXmlFile(zip, themeFilename)
   }
 
   const themeColors = []
@@ -230,7 +233,16 @@ async function getTheme(zip) {
   return { themeContent, themeColors }
 }
 
-async function processSingleSlide(zip, sldFileName, themeContent, defaultTextStyle, loadedImages, loadedVideos, loadedAudios, options) {
+async function readXmlFileCached(zip, filename, xmlCache) {
+  if (!filename) return null
+  if (Object.prototype.hasOwnProperty.call(xmlCache, filename)) return xmlCache[filename]
+
+  const content = await readXmlFile(zip, filename)
+  xmlCache[filename] = content
+  return content
+}
+
+async function processSingleSlide(zip, sldFileName, themeContent, defaultTextStyle, loadedImages, loadedVideos, loadedAudios, options, xmlCache) {
   const resName = sldFileName.replace('slides/slide', 'slides/_rels/slide') + '.rels'
   const resContent = await readXmlFile(zip, resName)
   if (!resContent) return null
@@ -251,7 +263,9 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     let relTarget = relationshipArrayItem['attrs']['Target']
     const isExternal = relationshipArrayItem['attrs']['TargetMode'] === 'External'
     if (!isExternal) {
-      if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+      relTarget = relTarget.replace(/\\/g, '/')
+      if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+      else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
       else relTarget = 'ppt/slides/' + relTarget
     }
 
@@ -294,10 +308,10 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const slideNotesContent = await readXmlFile(zip, noteFilename)
   const note = getNote(slideNotesContent)
 
-  const slideLayoutContent = await readXmlFile(zip, layoutFilename)
-  const slideLayoutTables = await indexNodes(slideLayoutContent)
+  const slideLayoutContent = await readXmlFileCached(zip, layoutFilename, xmlCache)
+  const slideLayoutTables = indexNodes(slideLayoutContent)
   const slideLayoutResFilename = layoutFilename.replace('slideLayouts/slideLayout', 'slideLayouts/_rels/slideLayout') + '.rels'
-  const slideLayoutResContent = await readXmlFile(zip, slideLayoutResFilename)
+  const slideLayoutResContent = await readXmlFileCached(zip, slideLayoutResFilename, xmlCache)
   if (slideLayoutResContent) {
     relationshipArray = slideLayoutResContent['Relationships']['Relationship']
     if (relationshipArray) {
@@ -305,7 +319,9 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
       for (const relationshipArrayItem of relationshipArray) {
         const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
         let relTarget = relationshipArrayItem['attrs']['Target']
-        if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+        relTarget = relTarget.replace(/\\/g, '/')
+        if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+        else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
         else relTarget = 'ppt/slideLayouts/' + relTarget
 
         switch (relationshipArrayItem['attrs']['Type']) {
@@ -322,11 +338,11 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     }
   }
 
-  const slideMasterContent = await readXmlFile(zip, masterFilename)
+  const slideMasterContent = await readXmlFileCached(zip, masterFilename, xmlCache)
   const slideMasterTextStyles = getTextByPathList(slideMasterContent, ['p:sldMaster', 'p:txStyles'])
   const slideMasterTables = indexNodes(slideMasterContent)
   const slideMasterResFilename = masterFilename.replace('slideMasters/slideMaster', 'slideMasters/_rels/slideMaster') + '.rels'
-  const slideMasterResContent = await readXmlFile(zip, slideMasterResFilename)
+  const slideMasterResContent = await readXmlFileCached(zip, slideMasterResFilename, xmlCache)
   if (slideMasterResContent) {
     relationshipArray = slideMasterResContent['Relationships']['Relationship']
     if (relationshipArray) {
@@ -334,7 +350,9 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
       for (const relationshipArrayItem of relationshipArray) {
         const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
         let relTarget = relationshipArrayItem['attrs']['Target']
-        if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+        relTarget = relTarget.replace(/\\/g, '/')
+        if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+        else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
         else relTarget = 'ppt/slideMasters/' + relTarget
 
         switch (relationshipArrayItem['attrs']['Type']) {
@@ -351,8 +369,9 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     }
   }
 
+  let currentThemeContent = themeContent
   if (themeFilename) {
-    themeContent = await readXmlFile(zip, themeFilename)
+    currentThemeContent = await readXmlFileCached(zip, themeFilename, xmlCache) || currentThemeContent
     const themeName = themeFilename.split('/').pop()
     const themeResFileName = themeFilename.replace(themeName, '_rels/' + themeName) + '.rels'
     const themeResContent = await readXmlFile(zip, themeResFileName)
@@ -361,16 +380,21 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
       if (relationshipArray) {
         if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
         for (const relationshipArrayItem of relationshipArray) {
+          let relTarget = relationshipArrayItem['attrs']['Target']
+          relTarget = relTarget.replace(/\\/g, '/')
+          if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+          else relTarget = relTarget.replace('../', 'ppt/')
+
           themeResObj[relationshipArrayItem['attrs']['Id']] = {
             'type': relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', ''),
-            'target': relationshipArrayItem['attrs']['Target'].replace('../', 'ppt/')
+            'target': relTarget
           }
         }
       }
     }
   }
 
-  const tableStyles = await readXmlFile(zip, 'ppt/tableStyles.xml')
+  const tableStyles = await readXmlFileCached(zip, 'ppt/tableStyles.xml', xmlCache)
 
   const slideContent = await readXmlFile(zip, sldFileName)
   if (!slideContent) return null
@@ -391,7 +415,7 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     slideMasterTextStyles,
     layoutResObj,
     masterResObj,
-    themeContent,
+    themeContent: currentThemeContent,
     themeResObj,
     diagramFileCache: {},
     defaultTextStyle,
@@ -499,7 +523,7 @@ function getNote(noteContent) {
           text += `<${listType}>`
           listTypes[listLevel] = listType
         }
-        text += `<li style="text-align:${align};">`
+        text += `<li><p style="text-align:${align};">`
       }
       else {
         while (listTypes.length > 0) {
@@ -517,7 +541,7 @@ function getNote(noteContent) {
         }
       }
 
-      if (listType) text += '</li>'
+      if (listType) text += '</p></li>'
       else text += '</p>'
     }
     while (listTypes.length > 0) {
@@ -649,6 +673,19 @@ async function processNodesInSlide(nodeKey, nodeValue, warpObj, source, groupHie
     default:
   }
 
+  if (json && typeof json === 'object' && !json.id) {
+    const id = getTextByPathList(nodeValue, ['p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['p:nvPicPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['p:nvCxnSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['p:nvGrpSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['p:nvGraphicFramePr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['mc:Choice', 'p:sp', 'p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['mc:Fallback', 'p:sp', 'p:nvSpPr', 'p:cNvPr', 'attrs', 'id']) ||
+      getTextByPathList(nodeValue, ['mc:Fallback', 'p:nvGrpSpPr', 'p:cNvPr', 'attrs', 'id'])
+
+    json.id = id || ''
+  }
+
   return json
 }
 
@@ -662,6 +699,8 @@ async function processMathNode(node, warpObj, source) {
   const { width, height } = getSize(xfrmNode, undefined, undefined)
 
   const oMath = findOMath(choice)[0]
+  if (!oMath) return null
+
   const latex = latexFormart(parseOMath(oMath))
 
   const blipFill = getTextByPathList(fallback, ['p:sp', 'p:spPr', 'a:blipFill'])
@@ -709,8 +748,8 @@ async function processGroupSpNode(node, warpObj, source, parentGroupHierarchy = 
   if (rotate) rotate = angleToDegrees(rotate)
 
   // 计算缩放因子
-  const ws = cx / chcx
-  const hs = cy / chcy
+  const ws = chcx === 0 ? 0 : cx / chcx
+  const hs = chcy === 0 ? 0 : cy / chcy
 
   // 构建当前组合层级（将当前组合添加到父级层级中）
   const currentGroupHierarchy = [...parentGroupHierarchy, node]
@@ -729,30 +768,44 @@ async function processGroupSpNode(node, warpObj, source, parentGroupHierarchy = 
     }
   }
 
+  const transformGroupedElement = (element, offsetX = 0, offsetY = 0) => {
+    const elementRotate = element.rotate || 0
+    const normalizedRotate = ((elementRotate % 360) + 360) % 360
+    const isUniformScale = Math.abs(ws - hs) < 0.000001
+    const shouldSwapDimensions = normalizedRotate === 90 || normalizedRotate === 270
+    const centerX = element.left + element.width / 2
+    const centerY = element.top + element.height / 2
+    const nextCenterX = (centerX - offsetX) * ws
+    const nextCenterY = (centerY - offsetY) * hs
+    const widthScale = shouldSwapDimensions && !isUniformScale ? hs : ws
+    const heightScale = shouldSwapDimensions && !isUniformScale ? ws : hs
+    const width = element.width * widthScale
+    const height = element.height * heightScale
+
+    const transformed = {
+      ...element,
+      left: numberToFixed(nextCenterX - width / 2),
+      top: numberToFixed(nextCenterY - height / 2),
+      width: numberToFixed(width),
+      height: numberToFixed(height),
+    }
+    return transformed
+  }
+
   const processedElements = elements.map(element => ({
-    ...element,
-    left: numberToFixed((element.left - chx) * ws),
-    top: numberToFixed((element.top - chy) * hs),
-    width: numberToFixed(element.width * ws),
-    height: numberToFixed(element.height * hs),
+    ...transformGroupedElement(element, chx, chy),
     ...(element.type === 'group' && element.elements ? {
-      elements: processNestedGroupElements(element.elements, ws, hs)
+      elements: processNestedGroupElements(element.elements)
     } : {})
   }))
 
-  function processNestedGroupElements(elements, ws, hs, depth = 0) {
+  function processNestedGroupElements(elements, depth = 0) {
     if (depth > 10) return elements
 
     return elements.map(element => {
-      const processed = {
-        ...element,
-        left: numberToFixed(element.left * ws),
-        top: numberToFixed(element.top * hs),
-        width: numberToFixed(element.width * ws),
-        height: numberToFixed(element.height * hs),
-      }
+      const processed = transformGroupedElement(element)
       if (element.type === 'group' && element.elements) {
-        processed.elements = processNestedGroupElements(element.elements, ws, hs, depth + 1)
+        processed.elements = processNestedGroupElements(element.elements, depth + 1)
       }
       return processed
     })
@@ -852,6 +905,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
 
   const { top, left } = getPosition(slideXfrmNode, slideLayoutXfrmNode, slideMasterXfrmNode)
   const { width, height } = getSize(slideXfrmNode, slideLayoutXfrmNode, slideMasterXfrmNode)
+  const pathViewBox = { x: 0, y: 0, width, height }
 
   const isFlipV = getTextByPathList(slideXfrmNode, ['attrs', 'flipV']) === '1' || getTextByPathList(slideXfrmNode, ['attrs', 'flipV']) === 'true'
   const isFlipH = getTextByPathList(slideXfrmNode, ['attrs', 'flipH']) === '1' || getTextByPathList(slideXfrmNode, ['attrs', 'flipH']) === 'true'
@@ -869,8 +923,12 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   let content = ''
   if (node['p:txBody']) content = genTextBody(node['p:txBody'], node, slideLayoutSpNode, slideMasterSpNode, type, warpObj)
 
-  const { borderColor, borderWidth, borderType, strokeDasharray, lineHead, lineTail } = getBorder(node, type, warpObj)
-  const fill = await getShapeFill(node, warpObj, source, groupHierarchy)
+  const { borderColor, borderWidth, borderType, strokeDasharray, headEnd, tailEnd } = getBorder(node, type, warpObj)
+  const fill = await getShapeFill(node, warpObj, source, {
+    groupHierarchy,
+    slideLayoutSpNode,
+    slideMasterSpNode,
+  })
 
   let shadow
   const outerShdwNode = getTextByPathList(node, ['p:spPr', 'a:effectLst', 'a:outerShdw'])
@@ -878,6 +936,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
 
   const vAlign = getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode, type)
   const isVertical = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'vert']) === 'eaVert'
+  const wrap = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'wrap']) !== 'none'
   const autoFit = getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode)
   const textInset = getTextInsets(node, slideLayoutSpNode, slideMasterSpNode)
 
@@ -896,6 +955,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
     isFlipH,
     rotate,
     vAlign,
+    wrap,
     name,
     order,
   }
@@ -904,6 +964,8 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   if (autoFit) data.autoFit = autoFit
   if (link) data.link = link
   if (textInset) data.textInset = textInset
+  if (headEnd) data.headEnd = headEnd
+  if (tailEnd) data.tailEnd = tailEnd
 
   const isHasValidText = data.content && hasValidText(data.content)
 
@@ -911,39 +973,48 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
     const d = getCustomShapePath(custShapType, width, height)
     if (!isHasValidText) data.content = ''
 
-    return {
+    const customShapeData = {
       ...data,
       type: 'shape',
       shapType: 'custom',
       path: d,
+      pathViewBox,
     }
+    if (isStrokeOnlyCustomGeometry(custShapType)) customShapeData.strokeOnly = true
+
+    return customShapeData
   }
 
   let shapePath = ''
   if (shapType) shapePath = getShapePath(shapType, width, height, node)
+  const STROKE_ONLY_PRESET_SHAPE_TYPES = ['arc', 'leftBrace', 'rightBrace', 'bracePair', 'leftBracket', 'rightBracket', 'bracketPair']
+  const isStrokeOnlyPresetShape = STROKE_ONLY_PRESET_SHAPE_TYPES.includes(shapType)
 
   if (shapType && (type === 'obj' || !type || shapType !== 'rect')) {
     if (!isHasValidText) data.content = ''
-    const shapeResult = {
+    const shapeData = {
       ...data,
       type: 'shape',
       shapType,
       path: shapePath,
+      pathViewBox,
       keypoints,
     }
-    if (lineHead) shapeResult.lineHead = lineHead
-    if (lineTail) shapeResult.lineTail = lineTail
-    return shapeResult
+    if (isStrokeOnlyPresetShape) shapeData.strokeOnly = true
+    return shapeData
   }
   if (shapType && !isHasValidText && (fill || borderWidth)) {
-    return {
+    const shapeData = {
       ...data,
       type: 'shape',
       content: '',
       shapType,
       path: shapePath,
+      pathViewBox,
       keypoints,
     }
+    if (isStrokeOnlyPresetShape) shapeData.strokeOnly = true
+    return shapeData
   }
   return {
     ...data,

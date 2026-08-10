@@ -31,56 +31,66 @@ function extractChartData(serNode) {
   const dataMat = []
   if (!serNode) return dataMat
 
-  if (serNode['c:xVal']) {
-    let dataRow = []
-    eachElement(serNode['c:xVal']['c:numRef']['c:numCache']['c:pt'], innerNode => {
-      dataRow.push(parseFloat(innerNode['c:v']))
-      return ''
-    })
-    dataMat.push(dataRow)
-    dataRow = []
-    eachElement(serNode['c:yVal']['c:numRef']['c:numCache']['c:pt'], innerNode => {
-      dataRow.push(parseFloat(innerNode['c:v']))
-      return ''
-    })
-    dataMat.push(dataRow)
-  } 
-  else {
-    eachElement(serNode, (innerNode, index) => {
-      const dataRow = []
-      const colName = getTextByPathList(innerNode, ['c:tx', 'c:strRef', 'c:strCache', 'c:pt', 'c:v']) || index
+  eachElement(serNode, (innerNode, index) => {
+    const dataRow = []
+    const colName = getTextByPathList(innerNode, ['c:tx', 'c:strRef', 'c:strCache', 'c:pt', 'c:v']) || index
 
-      const rowNames = {}
-      if (getTextByPathList(innerNode, ['c:cat', 'c:strRef', 'c:strCache', 'c:pt'])) {
-        eachElement(innerNode['c:cat']['c:strRef']['c:strCache']['c:pt'], innerNode => {
-          rowNames[innerNode['attrs']['idx']] = innerNode['c:v']
-          return ''
-        })
-      } 
-      else if (getTextByPathList(innerNode, ['c:cat', 'c:numRef', 'c:numCache', 'c:pt'])) {
-        eachElement(innerNode['c:cat']['c:numRef']['c:numCache']['c:pt'], innerNode => {
-          rowNames[innerNode['attrs']['idx']] = innerNode['c:v']
-          return ''
-        })
-      }
-
-      if (getTextByPathList(innerNode, ['c:val', 'c:numRef', 'c:numCache', 'c:pt'])) {
-        eachElement(innerNode['c:val']['c:numRef']['c:numCache']['c:pt'], innerNode => {
-          dataRow.push({
-            x: innerNode['attrs']['idx'],
-            y: parseFloat(innerNode['c:v']),
-          })
-          return ''
-        })
-      }
-
-      dataMat.push({
-        key: colName,
-        values: dataRow,
-        xlabels: rowNames,
+    const rowNames = {}
+    if (getTextByPathList(innerNode, ['c:cat', 'c:strRef', 'c:strCache', 'c:pt'])) {
+      eachElement(innerNode['c:cat']['c:strRef']['c:strCache']['c:pt'], innerNode => {
+        rowNames[innerNode['attrs']['idx']] = innerNode['c:v']
+        return ''
       })
+    } 
+    else if (getTextByPathList(innerNode, ['c:cat', 'c:numRef', 'c:numCache', 'c:pt'])) {
+      eachElement(innerNode['c:cat']['c:numRef']['c:numCache']['c:pt'], innerNode => {
+        rowNames[innerNode['attrs']['idx']] = innerNode['c:v']
+        return ''
+      })
+    }
+
+    if (getTextByPathList(innerNode, ['c:val', 'c:numRef', 'c:numCache', 'c:pt'])) {
+      eachElement(innerNode['c:val']['c:numRef']['c:numCache']['c:pt'], innerNode => {
+        dataRow.push({
+          x: innerNode['attrs']['idx'],
+          y: parseFloat(innerNode['c:v']),
+        })
+        return ''
+      })
+    }
+
+    dataMat.push({
+      key: colName,
+      values: dataRow,
+      xlabels: rowNames,
+    })
+    return ''
+  })
+
+  return dataMat
+}
+
+function extractScatterChartData(serNode) {
+  const dataMat = []
+  if (!serNode) return dataMat
+
+  const serNodes = serNode.constructor === Array ? serNode : [serNode]
+  const firstSerNode = serNodes[0]
+  const xData = []
+
+  eachElement(firstSerNode['c:xVal']['c:numRef']['c:numCache']['c:pt'], innerNode => {
+    xData.push(parseFloat(innerNode['c:v']))
+    return ''
+  })
+  dataMat.push(xData)
+
+  for (const node of serNodes) {
+    const yData = []
+    eachElement(node['c:yVal']['c:numRef']['c:numCache']['c:pt'], innerNode => {
+      yData.push(parseFloat(innerNode['c:v']))
       return ''
     })
+    dataMat.push(yData)
   }
 
   return dataMat
@@ -168,7 +178,7 @@ export function getChartInfo(plotArea, warpObj) {
       case 'c:scatterChart':
         chart = {
           type: 'scatterChart',
-          data: extractChartData(plotArea[key]['c:ser']),
+          data: extractScatterChartData(plotArea[key]['c:ser']),
           colors: extractChartColors(plotArea[key]['c:ser'], warpObj),
           style: getTextByPathList(plotArea[key], ['c:scatterStyle', 'attrs', 'val']),
         }
@@ -176,7 +186,7 @@ export function getChartInfo(plotArea, warpObj) {
       case 'c:bubbleChart':
         chart = {
           type: 'bubbleChart',
-          data: extractChartData(plotArea[key]['c:ser']),
+          data: extractScatterChartData(plotArea[key]['c:ser']),
           colors: extractChartColors(plotArea[key]['c:ser'], warpObj),
         }
         break

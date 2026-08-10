@@ -227,6 +227,15 @@ export function getCustomShapePath(custShapType, w, h) {
   return d
 }
 
+export function isStrokeOnlyCustomGeometry(custShapType) {
+  const pathNodes = getTextByPathList(custShapType, ['a:pathLst', 'a:path'])
+  if (!pathNodes) return false
+
+  const pathNodeList = Array.isArray(pathNodes) ? pathNodes : [pathNodes]
+
+  return pathNodeList.length === 1 && getTextByPathList(pathNodeList[0], ['attrs', 'fill']) === 'none'
+}
+
 export function identifyShape(shapeData) {
   const pathLst = shapeData['a:pathLst']
   if (!pathLst || !pathLst['a:path']) return 'custom'

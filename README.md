@@ -1,4 +1,4 @@
-﻿# 🎨 pptxtojson
+# 🎨 pptxtojson
 
 [![npm-version](https://img.shields.io/npm/v/pptxtojson)](https://www.npmjs.com/package/pptxtojson)
 [![npm download](https://img.shields.io/npm/dm/pptxtojson)](https://www.npmjs.com/package/pptxtojson)
@@ -7,36 +7,38 @@
 [![GitHub stars](https://img.shields.io/github/stars/pipipi-pikachu/pptxtojson)](https://www.github.com/pipipi-pikachu/pptxtojson/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/pipipi-pikachu/pptxtojson)](https://www.github.com/pipipi-pikachu/pptxtojson/network/members)
 
-一个运行在浏览器中，可以将 .pptx 文件转为可读的 JSON 数据的 JavaScript 库。
+[简体中文](README_zh.md) | English
 
-> 与其他的pptx文件解析工具的最大区别在于：
-> 1. 直接运行在浏览器端；
-> 2. 解析结果是**可读**的 JSON 数据，而不仅仅是把 XML 文件内容原样翻译成难以理解的 JSON。
+**pptxtojson is a browser-first PPTX parser that converts `.pptx` files into clean, readable, structured JSON.**
 
-在线DEMO：https://pipipi-pikachu.github.io/pptxtojson/
+Live demo: https://pipipi-pikachu.github.io/pptxtojson/
 
-> 国内镜像（定期同步）：[Gitee](https://gitee.com/pptist/pptxtojson)、[GitCode](https://gitcode.com/pipipi-pikachu/pptxtojson)
+> China mirrors, regularly synced: [Gitee](https://gitee.com/pptist/pptxtojson), [GitCode](https://gitcode.com/pipipi-pikachu/pptxtojson)
 
-# 🎯 注意事项
-### ⚒️ 使用场景
-本仓库诞生于项目 [PPTist](https://github.com/pipipi-pikachu/PPTist) ，希望为其“导入 .pptx 文件功能”提供一个参考示例。不过就目前来说，解析出来的PPT信息与源文件在样式上还是存在差异。
+# ✨ Core Capabilities
 
-但如果你只是需要提取PPT文件的文本内容、媒体资源信息、结构信息等，或者对排版/样式精准度没有特别高的要求，那么 pptxtojson 可能会对你有帮助。
+- **Browser-side parsing**: Read `.pptx` files directly in the browser, making it suitable for handling local user files without uploading them to a server for conversion.
+- **Readable JSON output**: Organize results by slides, elements, assets, themes, and related structures instead of exposing raw Office XML as low-level objects.
+- **Built for secondary processing**: Compared with simply converting PPTX to HTML, pptxtojson focuses more on data readability and programmability, making it easier to plug into downstream workflows.
 
-### 📏 长度值单位
-输出的JSON中，所有数值长度值单位都为`pt`（point）
+# 🚀 Use Cases
 
-# 🔨安装
+- **Web editor import**: Convert PPTX slides and elements into an editable data model, such as [PPTist](https://github.com/pipipi-pikachu/PPTist).
+- **Content extraction**: Extract text, speaker notes, media assets, and other information for search, archiving, review, or data analysis.
+- **AI document understanding**: Turn presentation content into structured input for summarization, question answering, knowledge-base ingestion, and similar workflows.
+- **Custom rendering**: Build your own preview, thumbnails, editing canvas, or conversion pipeline from the JSON result.
+
+# 🔨 Installation
 ```
 npm install pptxtojson
 ```
 
-# 💿用法
+# 💿 Usage
 ```javascript
 parse(file, options = {})
 ```
 
-### 浏览器示例
+### Browser Example
 ```html
 <input type="file" accept="application/vnd.openxmlformats-officedocument.presentationml.presentation"/>
 ```
@@ -60,7 +62,7 @@ document.querySelector('input').addEventListener('change', evt => {
 })
 ```
 
-### Node.js 示例（实验性，1.5.0以上版本）
+### Node.js Example (experimental, v1.5.0+)
 ```javascript
 const pptxtojson = require('pptxtojson/dist/index.cjs')
 const fs = require('fs')
@@ -79,7 +81,7 @@ async function func() {
 func()
 ```
 
-### 输出示例
+### Output Example
 ```javascript
 {
 	"slides": [
@@ -107,7 +109,7 @@ func()
 					"isFlipH": false,
 					"rotate": 0,
 					"vAlign": "mid",
-					"name": "矩形 1",
+					"name": "Rectangle 1",
 					"type": "shape",
 					"shapType": "rect"
 				},
@@ -116,7 +118,7 @@ func()
 			"layoutElements": [
 				// more...
 			],
-			"note": "演讲者备注内容..."
+			"note": "Speaker notes..."
 		},
 		// more...
 	],
@@ -128,208 +130,229 @@ func()
 }
 ```
 
-# 🎲 Options 配置说明
-> options 为可选参数，不传时使用默认配置。
+# 🎲 Options
+> `options` is optional. Default values are used when it is not provided.
 
-- `imageMode`：控制图片资源的解析方式，可选值为 `base64`、`blob`、`both`、`none`，默认值为 `base64`。
-	- `base64` 表示仅解析 `base64`。
-	- `blob` 表示仅解析 `blob`。
-	- `both` 表示同时解析 `base64` 和 `blob`。
-	- `none` 表示不解析图片内容。
+- `imageMode`: Controls how image assets are parsed. Available values: `base64`, `blob`, `both`, `none`. Default: `base64`.
+	- `base64` means only `base64` is parsed.
+	- `blob` means only `blob` is parsed.
+	- `both` means both `base64` and `blob` are parsed.
+	- `none` means image content is not parsed.
 
-- `videoMode`：控制视频资源的解析方式，可选值为 `blob`、`none`，默认值为 `none`。
-  - `blob` 表示解析视频 `blob`。
-  - `none` 表示不解析视频内容。
+- `videoMode`: Controls how video assets are parsed. Available values: `blob`, `none`. Default: `none`.
+  - `blob` means video `blob` is parsed.
+  - `none` means video content is not parsed.
 
-- `audioMode`：控制音频资源的解析方式，可选值为 `blob`、`none`，默认值为 `none`。
-  - `blob` 表示解析音频 `blob`。
-  - `none` 表示不解析音频内容。
+- `audioMode`: Controls how audio assets are parsed. Available values: `blob`, `none`. Default: `none`.
+  - `blob` means audio `blob` is parsed.
+  - `none` means audio content is not parsed.
 
-# 🕰️ 旧版本说明
-- 在0.x版本中，所有输出的长度值单位都是px（像素）
-- 在1.x及以下版本：
-	- 图片元素使用 `src` 字段返回 base64 数据；
-	- 图片填充仅返回 `picBase64`；
-	- 视频元素可能返回 `blob` 或 `src`；
-	- 音频元素仅返回 `blob`；
-	- 公式图片仅返回 `picBase64`；
+# 🎯 Notes
 
-# 📕 解析属性
+The current parsing result can achieve roughly 80%+ overall fidelity in layout and styling compared with the source file. For PPTX files manually created and edited from scratch by ordinary users, common page structures and basic styles can even reach 95%+ fidelity.
 
-- 幻灯片主题色 `themeColors`
+However, if the file comes from a complex online template, or if it was created by a highly skilled PowerPoint user with many "advanced techniques" such as complex masters, deeply nested groups, special shape effects, complex gradients, non-standard shapes, or complex SmartArt, the parsing difficulty increases significantly and the fidelity will decrease accordingly. These files are better treated as complex samples for separate evaluation.
 
-- 内置字体清单 `usedFonts`
+### Length Units
+All numeric length values in the output JSON use `pt` (point) as the unit.
 
-- 幻灯片尺寸 `size`
-	- 宽度 `width`
-	- 高度 `height`
+### Legacy Version Notes
+- In version 0.x, all output length values used px (pixels).
+- In version 1.x and earlier:
+	- Image elements used the `src` field to return base64 data.
+	- Image fills only returned `picBase64`.
+	- Video elements might return `blob` or `src`.
+	- Audio elements only returned `blob`.
+	- Formula images only returned `picBase64`.
 
-- 幻灯片页面 `slides`
+# 📕 Parsed Properties
 
-	- 页面备注 `note`
+- Slide theme colors `themeColors`
 
-	- 页面背景填充（颜色、图片、渐变、图案） `fill`
-		- 纯色填充 `type='color'`
-		- 图片填充 `type='image'`
-		- 渐变填充 `type='gradient'`
-		- 图案填充 `type='pattern'`
+- Embedded font list `usedFonts`
 
-	- 页面切换动画 `transition`
-		- 类型 `type`
-		- 持续时间 `duration`
-		- 方向 `direction`
+- Slide size `size`
+	- Width `width`
+	- Height `height`
 
-	- 页面内元素 `elements` / 母版元素 `layoutElements`
-		- 文字
-			- 类型 `type='text'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 边框颜色 `borderColor`
-			- 边框宽度 `borderWidth`
-			- 边框类型（实线、点线、虚线） `borderType`
-			- 非实线边框样式 `borderStrokeDasharray`
-			- 阴影 `shadow`
-			- 填充（颜色、图片、渐变、图案） `fill`
-			- 内容文字（HTML富文本：字体、字号、颜色、渐变、下划线、删除线、斜体、加粗、阴影、角标、超链接） `content`
-			- 垂直翻转 `isFlipV`
-			- 水平翻转 `isFlipH`
-			- 旋转角度 `rotate`
-			- 垂直对齐方向 `vAlign`
-			- 是否为竖向文本 `isVertical`
-			- 元素名 `name`
-			- 自动调整大小 `autoFit`
-				- 类型 `type`
-					- `shape`：文本框高度会根据文本内容自动调整
-					- `text`：文本框大小固定，字号会自动缩放以适应文本框（注：autoFit不存在时，也会固定文本框大小，但字号不会缩放）
-				- 字体缩放比例（type='text'专有，默认为1） `fontScale`
-			- 文本内边距（4边） `textInset`
-			- 超链接 `link`
+- Slides `slides`
 
-		- 图片
-			- 类型 `type='image'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 边框颜色 `borderColor`
-			- 边框宽度 `borderWidth`
-			- 边框类型（实线、点线、虚线） `borderType`
-			- 非实线边框样式 `borderStrokeDasharray`
-			- 裁剪形状 `geom`
-			- 裁剪范围 `rect`
-			- 资源引用路径 `ref`
-			- 图片base64 `base64`
-			- 图片blob `blob`
-			- 旋转角度 `rotate`
-			- 滤镜 `filters`
-			- 超链接 `link`
+	- Speaker notes `note`
 
-		- 形状
-			- 类型 `type='shape'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 边框颜色 `borderColor`
-			- 边框宽度 `borderWidth`
-			- 边框类型（实线、点线、虚线） `borderType`
-			- 非实线边框样式 `borderStrokeDasharray`
-			- 阴影 `shadow`
-			- 填充（颜色、图片、渐变、图案） `fill`
-			- 内容文字（HTML富文本，与文字元素一致） `content`
-			- 垂直翻转 `isFlipV`
-			- 水平翻转 `isFlipH`
-			- 旋转角度 `rotate`
-			- 形状类型 `shapType`
-			- 垂直对齐方向 `vAlign`
-			- 形状路径 `path`
-			- 形状调整参数 `keypoints`
-			- 元素名 `name`
-			- 自动调整大小 `autoFit`
-			- 文本内边距（4边） `textInset`
-			- 超链接 `link`
+	- Slide background fill (color, image, gradient, pattern) `fill`
+		- Solid color fill `type='color'`
+		- Image fill `type='image'`
+		- Gradient fill `type='gradient'`
+		- Pattern fill `type='pattern'`
 
-		- 表格
-			- 类型 `type='table'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 边框（4边） `borders`
-			- 单元格样式与数据 `data`
-			- 行高 `rowHeights`
-			- 列宽 `colWidths`
+	- Slide transition `transition`
+		- Type `type`
+		- Duration `duration`
+		- Direction `direction`
 
-		- 图表
-			- 类型 `type='chart'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 图表数据 `data`
-			- 图表主题色 `colors`
-			- 图表类型 `chartType`
-			- 柱状图方向 `barDir`
-			- 是否带数据标记 `marker`
-			- 环形图尺寸 `holeSize`
-			- 分组模式 `grouping`
-			- 图表样式 `style`
+	- Slide elements `elements` / master layout elements `layoutElements`
+		- OOXML ID `id`
+		- Text
+			- Type `type='text'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Border color `borderColor`
+			- Border width `borderWidth`
+			- Border type (solid, dotted, dashed) `borderType`
+			- Non-solid border style `borderStrokeDasharray`
+			- Shadow `shadow`
+			- Fill (color, image, gradient, pattern) `fill`
+			- Text content (HTML rich text) `content`:
+				- Inline styles/structure: font family, font size, color, gradient, underline, strikethrough, italic, bold, character spacing, shadow, superscript/subscript, hyperlink
+				- Block-level styles/structure: horizontal alignment, line spacing, paragraph spacing, indentation, first-line indentation, bullets, numbered lists
+			- Vertical flip `isFlipV`
+			- Horizontal flip `isFlipH`
+			- Rotation angle `rotate`
+			- Vertical alignment `vAlign`
+			- Whether text wraps automatically `wrap`
+			- Whether it is vertical text `isVertical`
+			- Element name `name`
+			- Auto fit `autoFit`
+				- Type `type`
+					- `shape`: the text box height automatically adjusts according to the text content
+					- `text`: the text box size is fixed, and the font size is automatically scaled to fit the text box (note: when `autoFit` does not exist, the text box size is also fixed, but the font size is not scaled)
+				- Font scale ratio (only for `type='text'`, default is 1) `fontScale`
+			- Text inset on four sides `textInset`
+			- Hyperlink `link`
 
-		- 视频
-			- 类型 `type='video'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 资源引用路径 `ref`
-			- 视频blob `blob`
+		- Image
+			- Type `type='image'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Border color `borderColor`
+			- Border width `borderWidth`
+			- Border type (solid, dotted, dashed) `borderType`
+			- Non-solid border style `borderStrokeDasharray`
+			- Crop shape `geom`
+			- Crop rectangle `rect`
+			- Asset reference path `ref`
+			- Image base64 `base64`
+			- Image blob `blob`
+			- Rotation angle `rotate`
+			- Filters `filters`
+			- Hyperlink `link`
 
-		- 音频
-			- 类型 `type='audio'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 资源引用路径 `ref`
-			- 音频blob `blob`
+		- Shape
+			- Type `type='shape'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Border color `borderColor`
+			- Border width `borderWidth`
+			- Border type (solid, dotted, dashed) `borderType`
+			- Non-solid border style `borderStrokeDasharray`
+			- Shadow `shadow`
+			- Fill (color, image, gradient, pattern) `fill`
+			- Stroke only (no fill) `strokeOnly`
+			- Text content (HTML rich text, same as text elements) `content`
+			- Vertical flip `isFlipV`
+			- Horizontal flip `isFlipH`
+			- Rotation angle `rotate`
+			- Shape type `shapType`
+			- Vertical alignment `vAlign`
+			- Whether text wraps automatically `wrap`
+			- Shape path `path`
+			- Shape path viewBox `pathViewBox`
+			- Line head endpoint `headEnd`
+			- Line tail endpoint `tailEnd`
+			- Shape adjustment parameters `keypoints`
+			- Element name `name`
+			- Auto fit `autoFit`
+			- Text inset on four sides `textInset`
+			- Hyperlink `link`
 
-		- 公式
-			- 类型 `type='math'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 公式图片引用路径 `picRef`
-			- 公式图片base64 `picBase64`
-			- 公式图片blob `picBlob`
-			- LaTeX表达式（仅支持常见结构） `latex`
-			- 文本（文本和公式混排时存在） `text`
+		- Table
+			- Type `type='table'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Borders on four sides `borders`
+			- Cell styles and data `data`
+			- Row heights `rowHeights`
+			- Column widths `colWidths`
 
-		- Smart图
-			- 类型 `type='diagram'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 子元素集合 `elements`
-			- 文本列表（Smart图中的文字内容清单） `textList`
+		- Chart
+			- Type `type='chart'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Chart data `data`
+			- Chart theme colors `colors`
+			- Chart type `chartType`
+			- Bar chart direction `barDir`
+			- Whether markers are enabled `marker`
+			- Doughnut chart hole size `holeSize`
+			- Grouping mode `grouping`
+			- Chart style `style`
 
-		- 多元素组合
-			- 类型 `type='group'`
-			- 水平坐标 `left`
-			- 垂直坐标 `top`
-			- 宽度 `width`
-			- 高度 `height`
-			- 子元素集合 `elements`
+		- Video
+			- Type `type='video'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Asset reference path `ref`
+			- Video blob `blob`
 
-### 更详细类型请参考 👇
+		- Audio
+			- Type `type='audio'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Asset reference path `ref`
+			- Audio blob `blob`
+
+		- Formula
+			- Type `type='math'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Formula image reference path `picRef`
+			- Formula image base64 `picBase64`
+			- Formula image blob `picBlob`
+			- LaTeX expression (only common structures are supported) `latex`
+			- Text (exists when text and formulas are mixed) `text`
+
+		- SmartArt
+			- Type `type='diagram'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Child elements `elements`
+			- Text list (text content list in SmartArt) `textList`
+
+		- Group
+			- Type `type='group'`
+			- Horizontal coordinate `left`
+			- Vertical coordinate `top`
+			- Width `width`
+			- Height `height`
+			- Child elements `elements`
+
+### See more detailed types here 👇
 [https://github.com/pipipi-pikachu/pptxtojson/blob/master/dist/index.d.ts](https://github.com/pipipi-pikachu/pptxtojson/blob/master/dist/index.d.ts)
 
-# 🙏 感谢
-本仓库大量参考了 [PPTX2HTML](https://github.com/g21589/PPTX2HTML) 和 [PPTXjs](https://github.com/meshesha/PPTXjs) 的实现。
-> 与它们不同的是：pptxtojson 不是将PPT文件转换为 HTML 页面，而是转换为干净、易读的 JSON 数据，且在原有基础上进行了大量优化补充，大幅提升了提取信息的完整度和准确度。
+# 🙏 Acknowledgements
+pptxtojson refers heavily to the implementations of [PPTX2HTML](https://github.com/g21589/PPTX2HTML) and [PPTXjs](https://github.com/meshesha/PPTXjs).
 
-# 📄 开源协议
+Unlike those projects, pptxtojson does not aim to convert PPT files into HTML pages. Instead, it outputs clean, readable JSON that is easier to process further, and it includes many optimizations and additions to improve the completeness and accuracy of extracted information.
+
+Issues and PRs with more PPTX samples, parsing scenarios, and improvement suggestions are welcome.
+
+# 📄 License
 MIT License | Copyright © 2020-PRESENT [pipipi-pikachu](https://github.com/pipipi-pikachu)

@@ -1,4 +1,5 @@
-import { getTextByPathList } from './utils'
+import { RATIO_EMUs_Points } from './constants'
+import { getTextByPathList, numberToFixed } from './utils'
 
 function getParagraphLevel(node) {
   let lvlIdx = 1
@@ -200,6 +201,14 @@ function getParagraphSpacingValue(spacingNode) {
   return undefined
 }
 
+function getParagraphIndentValue(styleNode, attrName) {
+  const val = getTextByPathList(styleNode, ['attrs', attrName])
+
+  if (val !== undefined && val !== '') return numberToFixed(parseInt(val) * RATIO_EMUs_Points) + 'pt'
+
+  return undefined
+}
+
 export function getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
   const styleNodes = getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
   if (!styleNodes) return null
@@ -246,4 +255,25 @@ function getLnSpcReduction(textBodyNode, slideLayoutSpNode, slideMasterSpNode) {
     if (val !== undefined) return parseInt(val)
   }
   return undefined
+}
+
+export function getParagraphIndent(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
+  const styleNodes = getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+  if (!styleNodes) return null
+
+  const indent = {}
+
+  for (const styleNode of styleNodes) {
+    if (indent.marginLeft === undefined) {
+      const marginLeft = getParagraphIndentValue(styleNode, 'marL')
+      if (marginLeft !== undefined) indent.marginLeft = marginLeft
+    }
+
+    if (indent.textIndent === undefined) {
+      const textIndent = getParagraphIndentValue(styleNode, 'indent')
+      if (textIndent !== undefined) indent.textIndent = textIndent
+    }
+  }
+
+  return Object.keys(indent).length > 0 ? indent : null
 }

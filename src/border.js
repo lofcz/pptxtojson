@@ -1,6 +1,16 @@
 import { getSolidFill, getGradientFill } from './fill'
 import { getTextByPathList } from './utils'
 
+function getLineEnd(node) {
+  const attrs = getTextByPathList(node, ['attrs'])
+  if (!attrs) return undefined
+
+  const lineEnd = { type: attrs.type || 'none' }
+  if (attrs.w) lineEnd.width = attrs.w
+  if (attrs.len) lineEnd.length = attrs.len
+  return lineEnd
+}
+
 export function getBorder(node, elType, warpObj) {
   const spPrLineNode = getTextByPathList(node, ['p:spPr', 'a:ln'])
   const lnRefNode = getTextByPathList(node, ['p:style', 'a:lnRef'])
@@ -98,24 +108,15 @@ export function getBorder(node, elType, warpObj) {
     default:
   }
 
+  const headEnd = getLineEnd(getTextByPathList(lineNode, ['a:headEnd']))
+  const tailEnd = getLineEnd(getTextByPathList(lineNode, ['a:tailEnd']))
+
   return {
     borderColor,
     borderWidth,
     borderType,
     strokeDasharray,
-    lineHead: getLineEnd(lineNode, 'a:headEnd'),
-    lineTail: getLineEnd(lineNode, 'a:tailEnd'),
-  }
-}
-
-function getLineEnd(lineNode, tag) {
-  const endNode = getTextByPathList(lineNode, [tag, 'attrs'])
-  if (!endNode) return null
-  const type = endNode['type'] || 'none'
-  if (type === 'none') return null
-  return {
-    type,
-    w: endNode['w'] || 'med',
-    len: endNode['len'] || 'med',
+    headEnd,
+    tailEnd,
   }
 }

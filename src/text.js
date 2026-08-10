@@ -1,4 +1,4 @@
-import { getHorizontalAlign, getParagraphSpacing } from './paragraph'
+import { getHorizontalAlign, getParagraphSpacing, getParagraphIndent } from './paragraph'
 import { getTextByPathList } from './utils'
 
 import {
@@ -60,6 +60,9 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
 
     const align = getHorizontalAlign(pNode, spNode, type, slideLayoutSpNode, slideMasterSpNode, warpObj)
     const spacing = getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+    const indent = getParagraphIndent(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+    const listType = getListType(pNode)
+    const listLevel = getListLevel(pNode)
 
     let alignStyle = align
     if (align === 'distribute') alignStyle = 'justify'
@@ -70,9 +73,10 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
       if (spacing.spaceBefore) styleText += `margin-top: ${spacing.spaceBefore};`
       if (spacing.spaceAfter) styleText += `margin-bottom: ${spacing.spaceAfter};`
     }
-
-    const listType = getListType(pNode)
-    const listLevel = getListLevel(pNode)
+    if (indent) {
+      if (!listType && indent.marginLeft) styleText += `margin-left: ${indent.marginLeft};`
+      if (!listType && indent.textIndent) styleText += `text-indent: ${indent.textIndent};`
+    }
 
     if (listType) {
       while (listTypes.length > listLevel + 1) {
@@ -89,14 +93,7 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
         text += `<${listType}>`
         listTypes[listLevel] = listType
       }
-      const firstRNode = rNode ? rNode[0] : pNode
-      const liLevel = listLevel + 1
-      const liFontSize = getFontSize(firstRNode, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, liLevel, defaultTextStyle)
-      const liFontColor = getFontColor(firstRNode, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, liLevel, pFontStyle, warpObj)
-      let liStyleText = styleText
-      if (liFontSize) liStyleText += `font-size: ${liFontSize};`
-      if (liFontColor && typeof liFontColor === 'string') liStyleText += `color: ${liFontColor};`
-      text += `<li style="${liStyleText}">`
+      text += `<li><p style="${styleText}">`
     }
     else {
       while (listTypes.length > 0) {
@@ -142,7 +139,7 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
       }
     }
 
-    if (listType) text += '</li>'
+    if (listType) text += '</p></li>'
     else text += '</p>'
   }
   while (listTypes.length > 0) {
