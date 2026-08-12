@@ -1,5 +1,6 @@
 import tinycolor from 'tinycolor2'
 import { getSchemeColorFromTheme } from './schemeColor'
+import { emfToPngDataUrl } from './emf'
 import {
   applyShade,
   applyTint,
@@ -77,6 +78,22 @@ async function loadMedia(filePath, warpObj, cacheKey, mode = 'base64') {
   if (!zipFile) return ''
   const arrayBuffer = await zipFile.async('arraybuffer')
   const mimeType = getMimeType(fileExt)
+
+  // Browsers cannot render EMF (typically OLE object previews); extract the
+  // embedded DIB bitmap and serve it as PNG instead of a broken image.
+  if (fileExt === 'emf') {
+    const pngDataUrl = emfToPngDataUrl(new Uint8Array(arrayBuffer))
+    if (pngDataUrl) {
+      if (mode === 'base64') {
+        cacheItem.base64 = pngDataUrl
+      }
+      else {
+        const pngBytes = Uint8Array.from(atob(pngDataUrl.split(',')[1]), c => c.charCodeAt(0))
+        cacheItem.blob = URL.createObjectURL(new Blob([pngBytes], { type: 'image/png' }))
+      }
+      return cacheItem[mode]
+    }
+  }
 
   if (mode === 'base64') {
     cacheItem.base64 = `data:${mimeType};base64,${base64ArrayBuffer(arrayBuffer)}`
