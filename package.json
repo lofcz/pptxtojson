@@ -47,7 +47,6 @@
 		"@rollup/plugin-terser": "^0.1.0",
 		"eslint": "^8.27.0",
 		"rollup": "^3.3.0",
-		"rollup-plugin-node-builtins": "^2.1.2",
-		"rollup-plugin-node-globals": "^1.4.0"
+		"rollup-plugin-polyfill-node": "^0.13.0"
 	}
 }
