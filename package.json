@@ -1,15 +1,17 @@
 {
 	"name": "@lofcz/pptxtojson",
 	"version": "2.2.0",
-	"description": "A javascript tool for parsing .pptx file (fork: inline OMML math via dwml-ts)",
+	"description": "A javascript tool for parsing .pptx file (fork)",
 	"type": "module",
 	"main": "./dist/index.umd.js",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
 	"scripts": {
-		"clean:dist": "rimraf dist",
-		"build": "rollup -c",
-		"dev": "rollup -c -w",
+		"build": "rslib build",
+		"dev": "rslib build --watch",
 		"lint": "eslint src --ext .js,.jsx,.ts,.tsx",
 		"test": "node --test test/"
 	},
@@ -30,23 +32,13 @@
 		"access": "public"
 	},
 	"dependencies": {
-		"dwml-ts": "^0.4.0",
+		"dwml-ts": "^0.5.0",
 		"jszip": "^3.10.1",
 		"tinycolor2": "1.6.0",
-		"txml": "^5.1.1"
+		"txml": "^6.0.0"
 	},
 	"devDependencies": {
-		"@babel/core": "^7.20.2",
-		"@babel/plugin-transform-runtime": "^7.19.6",
-		"@babel/preset-env": "^7.20.2",
-		"@babel/runtime": "^7.20.1",
-		"@rollup/plugin-babel": "^6.0.2",
-		"@rollup/plugin-commonjs": "^23.0.2",
-		"@rollup/plugin-eslint": "^9.0.1",
-		"@rollup/plugin-node-resolve": "^15.0.1",
-		"@rollup/plugin-terser": "^0.1.0",
-		"eslint": "^8.27.0",
-		"rollup": "^3.3.0",
-		"rollup-plugin-polyfill-node": "^0.13.0"
+		"@rslib/core": "^0.23.2",
+		"eslint": "^8.27.0"
 	}
 }
