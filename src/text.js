@@ -1,6 +1,6 @@
 import { getHorizontalAlign, getParagraphSpacing, getParagraphIndent } from './paragraph'
 import { getTextByPathList, escapeHtml } from './utils'
-import { getInlineMathRuns } from './math'
+import { getInlineMathRuns, getMathRunStyleNode, mathRunHasOwnSize, mathRunHasOwnColor } from './math'
 
 import {
   getFontType,
@@ -119,6 +119,11 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
       let prevStyleInfo = null
       let accumulatedText = ''
 
+      // Nearest sibling text run supplies size/color a math run doesn't pin
+      // itself — inline equations must look like the text they sit in.
+      const firstTextRun = rNode.find(item => !item.type)
+      let lastTextRun = null
+
       for (const rNodeItem of rNode) {
         if (rNodeItem.type === 'math') {
           if (accumulatedText && prevStyleInfo) {
@@ -129,9 +134,12 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
           prevStyleInfo = null
 
           const latex = escapeHtml(rNodeItem.latex)
-          text += `<span class="omml-math" data-latex="${latex}">${latex}</span>`
+          const siblingRun = lastTextRun || firstTextRun
+          const mathStyle = getMathRunStyleText(rNodeItem, siblingRun, pNode, textBodyNode, pFontStyle, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, defaultTextStyle, warpObj)
+          text += `<span class="omml-math" data-latex="${latex}"${mathStyle ? ` style="${mathStyle}"` : ''}>${latex}</span>`
           continue
         }
+        if (!rNodeItem.type) lastTextRun = rNodeItem
 
         const styleInfo = getSpanStyleInfo(rNodeItem, pNode, textBodyNode, pFontStyle, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, defaultTextStyle, warpObj)
 
@@ -169,6 +177,31 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
     text += `</${closedListType}>`
   }
   return text
+}
+
+/**
+ * Style text for an inline equation. Attributes the math run pins itself
+ * (`m:r > a:rPr`) win; anything unspecified inherits from the nearest sibling
+ * text run — matching how PowerPoint/LibreOffice render equations embedded in
+ * a line of text — before falling back to the usual paragraph/layout/master
+ * chain for math-only paragraphs.
+ */
+function getMathRunStyleText(mathRun, siblingRun, pNode, textBodyNode, pFontStyle, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, defaultTextStyle, warpObj) {
+  let lvl = 1
+  const lvlNode = getTextByPathList(pNode, ['a:pPr', 'attrs', 'lvl'])
+  if (lvlNode !== undefined) lvl = parseInt(lvlNode) + 1
+
+  const styleNode = getMathRunStyleNode(mathRun)
+  const sizeNode = mathRunHasOwnSize(styleNode) || !siblingRun ? styleNode : siblingRun
+  const colorNode = mathRunHasOwnColor(styleNode) || !siblingRun ? styleNode : siblingRun
+
+  const fontSize = getFontSize(sizeNode, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, defaultTextStyle)
+  const fontColor = getFontColor(colorNode, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, pFontStyle, warpObj)
+
+  let styleText = ''
+  if (fontSize) styleText += `font-size: ${fontSize};`
+  if (fontColor && typeof fontColor === 'string') styleText += `color: ${fontColor};`
+  return styleText
 }
 
 export function getListType(node) {
