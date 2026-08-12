@@ -1,5 +1,6 @@
 import { getHorizontalAlign, getParagraphSpacing, getParagraphIndent } from './paragraph'
-import { getTextByPathList } from './utils'
+import { getTextByPathList, escapeHtml } from './utils'
+import { getInlineMathRuns } from './math'
 
 import {
   getFontType,
@@ -58,6 +59,14 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
       }
     }
 
+    // Inline OMML math (<a14:m>/<m:oMath> siblings of <a:r>) — merge into the
+    // run list by document order so equations keep their place in the text.
+    const mathRuns = getInlineMathRuns(pNode)
+    if (mathRuns.length) {
+      rNode = (rNode || []).concat(mathRuns)
+      rNode.sort((a, b) => ((a.attrs && a.attrs.order) || 0) - ((b.attrs && b.attrs.order) || 0))
+    }
+
     const align = getHorizontalAlign(pNode, spNode, type, slideLayoutSpNode, slideMasterSpNode, warpObj)
     const spacing = getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
     const indent = getParagraphIndent(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
@@ -108,6 +117,19 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
       let accumulatedText = ''
 
       for (const rNodeItem of rNode) {
+        if (rNodeItem.type === 'math') {
+          if (accumulatedText && prevStyleInfo) {
+            const processedText = accumulatedText.replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;').replace(/\s/g, '&nbsp;')
+            text += `<span style="${prevStyleInfo.styleText}">${processedText}</span>`
+          }
+          accumulatedText = ''
+          prevStyleInfo = null
+
+          const latex = escapeHtml(rNodeItem.latex)
+          text += `<span class="omml-math" data-latex="${latex}">${latex}</span>`
+          continue
+        }
+
         const styleInfo = getSpanStyleInfo(rNodeItem, pNode, textBodyNode, pFontStyle, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, defaultTextStyle, warpObj)
 
         if (!prevStyleInfo || prevStyleInfo.styleText !== styleInfo.styleText || prevStyleInfo.hasLink !== styleInfo.hasLink || styleInfo.hasLink) {

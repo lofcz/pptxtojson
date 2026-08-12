@@ -12,7 +12,7 @@ import { extractFileExtension, getTextByPathList, angleToDegrees, isVideoLink, e
 import { getShadow } from './shadow'
 import { getTableBorders, getTableCellParams, getTableRowParams } from './table'
 import { RATIO_EMUs_Points } from './constants'
-import { findOMath, latexFormart, parseOMath } from './math'
+import { findOMath, oMathToLatex } from './math'
 import { getShapePath } from './shapePath'
 import { parseTransition, findTransitionNode } from './animation'
 import { getDiagramNodeContext, getSmartArtTextData } from './diagram'
@@ -602,7 +602,7 @@ async function processMathNode(node, warpObj, source) {
   const oMath = findOMath(choice)[0]
   if (!oMath) return null
 
-  const latex = latexFormart(parseOMath(oMath))
+  const latex = oMathToLatex(oMath)
 
   const blipFill = getTextByPathList(fallback, ['p:sp', 'p:spPr', 'a:blipFill'])
   const picFill = await getPicFill(source, blipFill, warpObj)

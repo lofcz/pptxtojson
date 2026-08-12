@@ -1,32 +1,36 @@
 {
-	"name": "pptxtojson",
-	"version": "2.1.0",
-	"description": "A javascript tool for parsing .pptx file",
+	"name": "@lofcz/pptxtojson",
+	"version": "2.2.0",
+	"description": "A javascript tool for parsing .pptx file (fork: inline OMML math via dwml-ts)",
 	"type": "module",
 	"main": "./dist/index.umd.js",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"scripts": {
 		"clean:dist": "rimraf dist",
+		"build": "rollup -c",
 		"dev": "rollup -c -w",
-		"lint": "eslint src --ext .js,.jsx,.ts,.tsx"
+		"lint": "eslint src --ext .js,.jsx,.ts,.tsx",
+		"test": "node --test test/"
 	},
 	"author": "pipipi_pikachu@163.com",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/pipipi-pikachu/pptxtojson"
+		"url": "https://github.com/lofcz/pptxtojson"
 	},
 	"keywords": [
 		"ppt",
 		"pptx",
 		"json"
 	],
-	"homepage": "https://github.com/pipipi-pikachu/pptxtojson",
+	"homepage": "https://github.com/lofcz/pptxtojson",
 	"license": "MIT",
 	"publishConfig": {
-		"registry": "https://registry.npmjs.org"
+		"registry": "https://registry.npmjs.org",
+		"access": "public"
 	},
 	"dependencies": {
+		"dwml-ts": "^0.4.0",
 		"jszip": "^3.10.1",
 		"tinycolor2": "1.6.0",
 		"txml": "^5.1.1"
