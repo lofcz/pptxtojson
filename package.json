@@ -13,7 +13,7 @@
 		"build": "rslib build",
 		"dev": "rslib build --watch",
 		"lint": "eslint src --ext .js,.jsx,.ts,.tsx",
-		"test": "node --test test/"
+		"test": "node --test \"test/*.test.js\""
 	},
 	"author": "pipipi_pikachu@163.com",
 	"repository": {
