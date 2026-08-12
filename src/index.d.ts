@@ -43,8 +43,12 @@ export interface PatternFill {
 
 export type Fill = ColorFill | ImageFill | GradientFill | PatternFill
 
+export type BorderColor =
+  | { type: 'color', value: string }
+  | { type: 'gradient', value: GradientFill['value'] }
+
 export interface Border {
-  borderColor: string
+  borderColor: BorderColor
   borderWidth: number
   borderType:'solid' | 'dashed' | 'dotted'
 }
@@ -81,7 +85,7 @@ export interface Shape {
   top: number
   width: number
   height: number
-  borderColor: string
+  borderColor: BorderColor
   borderWidth: number
   borderType: 'solid' | 'dashed' | 'dotted'
   borderStrokeDasharray: string
@@ -114,7 +118,7 @@ export interface Text {
   top: number
   width: number
   height: number
-  borderColor: string
+  borderColor: BorderColor
   borderWidth: number
   borderType: 'solid' | 'dashed' | 'dotted'
   borderStrokeDasharray: string
@@ -155,7 +159,7 @@ export interface Image {
     r?: number
   }
   geom: string
-  borderColor: string
+  borderColor: BorderColor
   borderWidth: number
   borderType: 'solid' | 'dashed' | 'dotted'
   borderStrokeDasharray: string

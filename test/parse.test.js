@@ -62,6 +62,30 @@ test('math spans carry the deck font size and inherit sibling run color', async 
   assert.match(inline, /color: #0F766E;/)
 })
 
+test('line shapes keep geometry and structured border color', async () => {
+  const json = await loadDeck('zlomky-lines.pptx')
+
+  const collect = elements => elements.flatMap(el => el.type === 'group' ? collect(el.elements) : [el])
+  const lines = json.slides.flatMap(s => collect(s.elements)).filter(el => el.shapType === 'line')
+
+  assert.ok(lines.length >= 4, `expected line shapes, got ${lines.length}`)
+
+  for (const line of lines) {
+    // Consumers (PPTist) draw these from the border — the contract is a
+    // structured color plus a resolvable stroke width and a path.
+    assert.equal(typeof line.borderColor, 'object')
+    assert.ok(['color', 'gradient'].includes(line.borderColor.type))
+    if (line.borderColor.type === 'color') assert.match(line.borderColor.value, /^#[0-9A-Fa-f]{6}$|^transparent$/)
+    assert.ok(line.borderWidth > 0)
+    assert.ok(line.path && line.path.startsWith('M'))
+  }
+
+  // The fraction bars from the source deck: horizontal, zero-height, sky blue.
+  const bars = lines.filter(l => l.borderColor.value === '#0EA5E9')
+  assert.ok(bars.length >= 3)
+  assert.ok(bars.every(l => l.height === 0 && l.width > 0))
+})
+
 test('keeps font faces from the source deck', async () => {
   const json = await loadDeck('zlomky.pptx')
   const contents = json.slides.flatMap(s => s.elements).map(el => el.content || '').join('')
