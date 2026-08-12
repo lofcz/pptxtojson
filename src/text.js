@@ -73,7 +73,10 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
     const listType = getListType(pNode)
     const listLevel = getListLevel(pNode)
 
-    let styleText = `text-align: ${align};`
+    let alignStyle = align
+    if (align === 'distribute') alignStyle = 'justify'
+    let styleText = `text-align: ${alignStyle};line-height: 1.2;`
+    if (align === 'distribute') styleText += `text-align-last: justify;text-justify: distribute;`
     if (spacing) {
       if (spacing.lineSpacing) styleText += `line-height: ${spacing.lineSpacing};`
       if (spacing.spaceBefore) styleText += `margin-top: ${spacing.spaceBefore};`
@@ -172,6 +175,11 @@ export function getListType(node) {
   const pPrNode = node['a:pPr']
   if (!pPrNode) return ''
 
+  if (pPrNode['a:buNone']) return ''
+
+  const hasContent = node['a:r'] || node['a:br'] || node['a:fld']
+  if (!hasContent) return ''
+
   if (pPrNode['a:buChar']) return 'ul'
   if (pPrNode['a:buAutoNum']) return 'ol'
   
@@ -210,7 +218,7 @@ export function getSpanStyleInfo(node, pNode, textBodyNode, pFontStyle, slideLay
   let styleText = ''
   const fontColor = getFontColor(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, pFontStyle, warpObj)
   const fontSize = getFontSize(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, defaultTextStyle)
-  const fontType = getFontType(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, warpObj)
+  const fontType = getFontType(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl, warpObj, text)
   const fontBold = getFontBold(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
   const fontItalic = getFontItalic(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)
   const fontDecoration = getFontDecoration(node, pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, lvl)

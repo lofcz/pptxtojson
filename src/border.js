@@ -1,6 +1,4 @@
-import tinycolor from 'tinycolor2'
-import { getSolidFill } from './fill'
-import { getSchemeColorFromTheme } from './schemeColor'
+import { getSolidFill, getGradientFill } from './fill'
 import { getTextByPathList } from './utils'
 
 function getLineEnd(node) {
@@ -14,9 +12,10 @@ function getLineEnd(node) {
 }
 
 export function getBorder(node, elType, warpObj) {
-  let lineNode = getTextByPathList(node, ['p:spPr', 'a:ln'])
+  const spPrLineNode = getTextByPathList(node, ['p:spPr', 'a:ln'])
+  const lnRefNode = getTextByPathList(node, ['p:style', 'a:lnRef'])
+  let lineNode = spPrLineNode
   if (!lineNode) {
-    const lnRefNode = getTextByPathList(node, ['p:style', 'a:lnRef'])
     if (lnRefNode) {
       const lnIdx = getTextByPathList(lnRefNode, ['attrs', 'idx'])
       lineNode = warpObj['themeContent']['a:theme']['a:themeElements']['a:fmtScheme']['a:lnStyleLst']['a:ln'][Number(lnIdx) - 1]
@@ -25,36 +24,42 @@ export function getBorder(node, elType, warpObj) {
   if (!lineNode) lineNode = node
 
   const isNoFill = getTextByPathList(lineNode, ['a:noFill'])
+  const hasFill = lineNode['a:solidFill'] || lineNode['a:gradFill']
+  const hasWidth = getTextByPathList(lineNode, ['attrs', 'w']) !== undefined
 
+  // 正常解析边框宽度
   let borderWidth = isNoFill ? 0 : (parseInt(getTextByPathList(lineNode, ['attrs', 'w'])) / 12700)
   if (isNaN(borderWidth)) {
-    if (lineNode) borderWidth = 0
-    else if (elType !== 'obj') borderWidth = 0
-    else borderWidth = 1
+    const hasLineNode = lineNode && lineNode !== node
+    borderWidth = (hasLineNode && (hasFill || hasWidth)) ? 9525 / 12700 : 0
   }
 
-  const solidFill = getTextByPathList(lineNode, ['a:solidFill'])
-  let borderColor = getSolidFill(solidFill, undefined, undefined, warpObj)
+  let borderColor = null
 
-  if (!borderColor) {
-    const schemeClrNode = getTextByPathList(node, ['p:style', 'a:lnRef', 'a:schemeClr'])
-    const schemeClr = 'a:' + getTextByPathList(schemeClrNode, ['attrs', 'val'])
-    borderColor = getSchemeColorFromTheme(schemeClr, warpObj)
+  if (lineNode['a:solidFill']) {
+    const color = getSolidFill(lineNode['a:solidFill'], undefined, undefined, warpObj)
+    if (color) borderColor = { type: 'color', value: color }
+  }
 
-    if (borderColor) {
-      let shade = getTextByPathList(schemeClrNode, ['a:shade', 'attrs', 'val'])
-
-      if (shade) {
-        shade = parseInt(shade) / 100000
-        
-        const color = tinycolor('#' + borderColor).toHsl()
-        borderColor = tinycolor({ h: color.h, s: color.s, l: color.l * shade, a: color.a }).toHex()
-      }
+  // 仅当形状本身没有定义 a:ln（使用 lnRef 主题样式）时，才从 lnRef 取颜色
+  if (!borderColor && !spPrLineNode) {
+    if (lnRefNode) {
+      const color = getSolidFill(lnRefNode, undefined, undefined, warpObj)
+      if (color) borderColor = { type: 'color', value: color }
     }
   }
 
-  if (!borderColor) borderColor = '#000000'
-  else if (!borderColor.startsWith('#')) borderColor = `#${borderColor}`
+  if (!borderColor && lineNode['a:gradFill']) {
+    const gradValue = getGradientFill(lineNode['a:gradFill'], warpObj)
+    if (gradValue && gradValue.colors && gradValue.colors.length > 0) {
+      borderColor = { type: 'gradient', value: gradValue }
+    }
+  }
+
+  // 默认边框颜色为透明
+  if (!borderColor) {
+    borderColor = { type: 'color', value: 'transparent' }
+  }
 
   const type = getTextByPathList(lineNode, ['a:prstDash', 'attrs', 'val'])
   let borderType = 'solid'

@@ -1,14 +1,15 @@
 import JSZip from 'jszip'
 import { readXmlFile } from './readXmlFile'
 import { getBorder } from './border'
-import { getSlideBackgroundFill, getShapeFill, getSolidFill, getPicFill, getPicFilters, getImageData, getVideoData, getAudioData } from './fill'
+import { getSlideBackgroundFill, getShapeFill, getSolidFill, getPicFill, getPicFilters, getPicFillOpacity, getImageData, getVideoData, getAudioData } from './fill'
 import { getChartInfo } from './chart'
-import { getVerticalAlign, getTextAutoFit } from './paragraph'
+import { getVerticalAlign, getTextDirection, getTextAutoFit } from './paragraph'
 import { getTextInsets } from './textInsets'
 import { getPosition, getSize } from './position'
 import { genTextBody, getTextNodeValue } from './text'
 import { getCustomShapePath, identifyShape, isStrokeOnlyCustomGeometry } from './shape'
 import { extractFileExtension, getTextByPathList, angleToDegrees, isVideoLink, escapeHtml, hasValidText, numberToFixed, isOoxmlTrue } from './utils'
+import { getFontData, getFontFallback } from './font'
 import { getShadow } from './shadow'
 import { getTableBorders, getTableCellParams, getTableRowParams } from './table'
 import { RATIO_EMUs_Points } from './constants'
@@ -29,7 +30,23 @@ export async function parse(file, options = {}) {
     videoMode: options.videoMode || 'none',
     audioMode: options.audioMode || 'none',
   }
-  
+
+  // 检测是否为加密文件（OLE2/CFB 格式，魔数为 D0 CF 11 E0）
+  let fileBytes
+  if (file instanceof ArrayBuffer) {
+    fileBytes = new Uint8Array(file)
+  }
+  else if (typeof File !== 'undefined' && file instanceof File) {
+    const buf = await file.arrayBuffer()
+    fileBytes = new Uint8Array(buf)
+  }
+  else if (typeof Buffer !== 'undefined' && Buffer.isBuffer(file)) {
+    fileBytes = new Uint8Array(file)
+  }
+  if (fileBytes && fileBytes[0] === 0xD0 && fileBytes[1] === 0xCF && fileBytes[2] === 0x11 && fileBytes[3] === 0xE0) {
+    throw new Error('ENCRYPTED_FILE')
+  }
+
   const zip = await JSZip.loadAsync(file)
 
   const filesInfo = await getContentTypes(zip)
@@ -39,7 +56,7 @@ export async function parse(file, options = {}) {
 
   for (const filename of filesInfo.slides) {
     const singleSlide = await processSingleSlide(zip, filename, themeContent, defaultTextStyle, loadedImages, loadedVideos, loadedAudios, parseOptions, xmlCache)
-    slides.push(singleSlide)
+    if (singleSlide) slides.push(singleSlide)
   }
 
   return {
@@ -93,9 +110,54 @@ async function getUsedFonts(zip) {
   if (!embeddedFontList) return usedFonts
 
   const embeddedFonts = embeddedFontList.constructor === Array ? embeddedFontList : [embeddedFontList]
+
+  // 读取 presentation.xml.rels，获取字体文件路径
+  const relsContent = await readXmlFile(zip, 'ppt/_rels/presentation.xml.rels')
+  const relsMap = {}
+  if (relsContent) {
+    let relItems = getTextByPathList(relsContent, ['Relationships', 'Relationship'])
+    if (relItems) {
+      if (relItems.constructor !== Array) relItems = [relItems]
+      for (const rel of relItems) {
+        const id = getTextByPathList(rel, ['attrs', 'Id'])
+        const target = getTextByPathList(rel, ['attrs', 'Target'])
+        if (id && target) relsMap[id] = target
+      }
+    }
+  }
+
+  const FONT_VARIANTS = ['p:regular', 'p:bold', 'p:italic', 'p:boldItalic']
+
   for (const embeddedFont of embeddedFonts) {
     const typeface = getTextByPathList(embeddedFont, ['p:font', 'attrs', 'typeface'])
-    if (typeface && !usedFonts.includes(typeface)) usedFonts.push(typeface)
+    if (!typeface) continue
+
+    let fontBlob = ''
+    for (const variant of FONT_VARIANTS) {
+      const variantNode = embeddedFont[variant]
+      if (!variantNode) continue
+      const rid = getTextByPathList(variantNode, ['attrs', 'r:id'])
+      if (!rid) continue
+      const relTarget = relsMap[rid]
+      if (!relTarget) continue
+
+      let fontPath = relTarget
+      if (fontPath.startsWith('../')) {
+        fontPath = fontPath.substring(3)
+      }
+      else {
+        fontPath = 'ppt/' + fontPath
+      }
+
+      fontBlob = await getFontData(zip, fontPath)
+      if (fontBlob) break
+    }
+
+    usedFonts.push({
+      name: typeface,
+      fontFamily: getFontFallback(typeface),
+      blob: fontBlob,
+    })
   }
 
   return usedFonts
@@ -113,9 +175,11 @@ async function getSlideInfo(zip) {
 }
 
 async function getTheme(zip) {
+  let themeContent = null
+  let themeURI
+
   const preResContent = await readXmlFile(zip, 'ppt/_rels/presentation.xml.rels')
   const relationshipArray = preResContent['Relationships']['Relationship']
-  let themeURI
 
   if (relationshipArray.constructor === Array) {
     for (const relationshipItem of relationshipArray) {
@@ -124,25 +188,45 @@ async function getTheme(zip) {
         break
       }
     }
-  } 
+  }
   else if (relationshipArray['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
     themeURI = relationshipArray['attrs']['Target']
   }
 
-  let themeContent = null
+  if (!themeURI) {
+    const masterResContent = await readXmlFile(zip, 'ppt/slideMasters/_rels/slideMaster1.xml.rels')
+    if (masterResContent) {
+      const masterRelationshipArray = masterResContent['Relationships']['Relationship']
+      if (masterRelationshipArray.constructor === Array) {
+        for (const relationshipItem of masterRelationshipArray) {
+          if (relationshipItem['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
+            themeURI = relationshipItem['attrs']['Target']
+            break
+          }
+        }
+      }
+      else if (masterRelationshipArray['attrs']['Type'] === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme') {
+        themeURI = masterRelationshipArray['attrs']['Target']
+      }
+    }
+  }
+
   if (themeURI) {
     themeURI = themeURI.replace(/\\/g, '/')
+    if (themeURI.startsWith('../')) themeURI = themeURI.substring(3)
     const themeFilename = themeURI.indexOf('/ppt/') === 0 ? themeURI.substr(1) : 'ppt/' + themeURI
     themeContent = await readXmlFile(zip, themeFilename)
   }
 
   const themeColors = []
-  const clrScheme = getTextByPathList(themeContent, ['a:theme', 'a:themeElements', 'a:clrScheme'])
-  if (clrScheme) {
-    for (let i = 1; i <= 6; i++) {
-      if (clrScheme[`a:accent${i}`] === undefined) break
-      const color = getTextByPathList(clrScheme, [`a:accent${i}`, 'a:srgbClr', 'attrs', 'val'])
-      if (color) themeColors.push('#' + color)
+  if (themeContent) {
+    const clrScheme = getTextByPathList(themeContent, ['a:theme', 'a:themeElements', 'a:clrScheme'])
+    if (clrScheme) {
+      for (let i = 1; i <= 6; i++) {
+        if (clrScheme[`a:accent${i}`] === undefined) break
+        const color = getTextByPathList(clrScheme, [`a:accent${i}`, 'a:srgbClr', 'attrs', 'val'])
+        if (color) themeColors.push('#' + color)
+      }
     }
   }
 
@@ -161,6 +245,7 @@ async function readXmlFileCached(zip, filename, xmlCache) {
 async function processSingleSlide(zip, sldFileName, themeContent, defaultTextStyle, loadedImages, loadedVideos, loadedAudios, options, xmlCache) {
   const resName = sldFileName.replace('slides/slide', 'slides/_rels/slide') + '.rels'
   const resContent = await readXmlFile(zip, resName)
+  if (!resContent) return null
   let relationshipArray = resContent['Relationships']['Relationship']
   if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
   
@@ -227,26 +312,29 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const slideLayoutTables = indexNodes(slideLayoutContent)
   const slideLayoutResFilename = layoutFilename.replace('slideLayouts/slideLayout', 'slideLayouts/_rels/slideLayout') + '.rels'
   const slideLayoutResContent = await readXmlFileCached(zip, slideLayoutResFilename, xmlCache)
-  relationshipArray = slideLayoutResContent['Relationships']['Relationship']
-  if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
+  if (slideLayoutResContent) {
+    relationshipArray = slideLayoutResContent['Relationships']['Relationship']
+    if (relationshipArray) {
+      if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
+      for (const relationshipArrayItem of relationshipArray) {
+        const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
+        let relTarget = relationshipArrayItem['attrs']['Target']
+        relTarget = relTarget.replace(/\\/g, '/')
+        if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+        else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+        else relTarget = 'ppt/slideLayouts/' + relTarget
 
-  for (const relationshipArrayItem of relationshipArray) {
-    const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
-    let relTarget = relationshipArrayItem['attrs']['Target']
-    relTarget = relTarget.replace(/\\/g, '/')
-    if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
-    else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
-    else relTarget = 'ppt/slideLayouts/' + relTarget
-
-    switch (relationshipArrayItem['attrs']['Type']) {
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster':
-        masterFilename = relTarget
-        break
-      default:
-        layoutResObj[relationshipArrayItem['attrs']['Id']] = {
-          type: relType,
-          target: relTarget,
+        switch (relationshipArrayItem['attrs']['Type']) {
+          case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster':
+            masterFilename = relTarget
+            break
+          default:
+            layoutResObj[relationshipArrayItem['attrs']['Id']] = {
+              type: relType,
+              target: relTarget,
+            }
         }
+      }
     }
   }
 
@@ -255,32 +343,35 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const slideMasterTables = indexNodes(slideMasterContent)
   const slideMasterResFilename = masterFilename.replace('slideMasters/slideMaster', 'slideMasters/_rels/slideMaster') + '.rels'
   const slideMasterResContent = await readXmlFileCached(zip, slideMasterResFilename, xmlCache)
-  relationshipArray = slideMasterResContent['Relationships']['Relationship']
-  if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
+  if (slideMasterResContent) {
+    relationshipArray = slideMasterResContent['Relationships']['Relationship']
+    if (relationshipArray) {
+      if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
+      for (const relationshipArrayItem of relationshipArray) {
+        const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
+        let relTarget = relationshipArrayItem['attrs']['Target']
+        relTarget = relTarget.replace(/\\/g, '/')
+        if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
+        else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
+        else relTarget = 'ppt/slideMasters/' + relTarget
 
-  for (const relationshipArrayItem of relationshipArray) {
-    const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
-    let relTarget = relationshipArrayItem['attrs']['Target']
-    relTarget = relTarget.replace(/\\/g, '/')
-    if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
-    else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
-    else relTarget = 'ppt/slideMasters/' + relTarget
-
-    switch (relationshipArrayItem['attrs']['Type']) {
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme':
-        themeFilename = relTarget
-        break
-      default:
-        masterResObj[relationshipArrayItem['attrs']['Id']] = {
-          type: relType,
-          target: relTarget,
+        switch (relationshipArrayItem['attrs']['Type']) {
+          case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme':
+            themeFilename = relTarget
+            break
+          default:
+            masterResObj[relationshipArrayItem['attrs']['Id']] = {
+              type: relType,
+              target: relTarget,
+            }
         }
+      }
     }
   }
 
   let currentThemeContent = themeContent
   if (themeFilename) {
-    currentThemeContent = currentThemeContent || await readXmlFileCached(zip, themeFilename, xmlCache)
+    currentThemeContent = await readXmlFileCached(zip, themeFilename, xmlCache) || currentThemeContent
     const themeName = themeFilename.split('/').pop()
     const themeResFileName = themeFilename.replace(themeName, '_rels/' + themeName) + '.rels'
     const themeResContent = await readXmlFile(zip, themeResFileName)
@@ -306,6 +397,7 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const tableStyles = await readXmlFileCached(zip, 'ppt/tableStyles.xml', xmlCache)
 
   const slideContent = await readXmlFile(zip, sldFileName)
+  if (!slideContent) return null
   const nodes = slideContent['p:sld']['p:cSld']['p:spTree']
   const warpObj = {
     zip,
@@ -346,12 +438,17 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
 
   const transition = parseTransition(transitionNode)
 
+  const showMasterSpOnSlide = getTextByPathList(slideContent, ['p:sld', 'attrs', 'showMasterSp'])
+  const isHidden = v => v === '0' || v === 'false'
+  const hideBackground = isHidden(showMasterSpOnSlide)
+
   return {
     fill,
     elements,
     layoutElements,
     note,
     transition,
+    hideBackground,
   }
 }
 
@@ -506,8 +603,10 @@ async function getLayoutElements(warpObj) {
 }
 
 function indexNodes(content) {
+  if (!content) return { idTable: {}, idxTable: {}, typeTable: {} }
   const keys = Object.keys(content)
-  const spTreeNode = content[keys[0]]['p:cSld']['p:spTree']
+  const spTreeNode = content[keys[0]]?.['p:cSld']?.['p:spTree']
+  if (!spTreeNode) return { idTable: {}, idxTable: {}, typeTable: {} }
   const idTable = {}
   const idxTable = {}
   const typeTable = {}
@@ -836,10 +935,11 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   if (outerShdwNode) shadow = getShadow(outerShdwNode, warpObj)
 
   const vAlign = getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode, type)
-  // Vertical (East-Asian) writing mode. Read once here and reported on every branch below: a
-  // <a:bodyPr vert="eaVert"> is just as valid on a shape as on a plain text box, and dropping it
-  // for shapes leaves the consumer laying that text out horizontally.
-  const isVertical = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'vert']) === 'eaVert'
+  // Vertical writing mode, inherited through layout/master. Read once here and reported on
+  // every branch below: a vertical <a:bodyPr vert> is just as valid on a shape as on a plain
+  // text box, and dropping it for shapes leaves the consumer laying that text out horizontally.
+  const textDirection = getTextDirection(node, slideLayoutSpNode, slideMasterSpNode)
+  const isVertical = textDirection !== 'horz'
   const wrap = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'wrap']) !== 'none'
   const autoFit = getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode)
   const textInset = getTextInsets(node, slideLayoutSpNode, slideMasterSpNode)
@@ -874,10 +974,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   const isHasValidText = data.content && hasValidText(data.content)
 
   if (custShapType && type !== 'diagram') {
-    const ext = getTextByPathList(slideXfrmNode, ['a:ext', 'attrs'])
-    const w = parseInt(ext['cx']) * RATIO_EMUs_Points
-    const h = parseInt(ext['cy']) * RATIO_EMUs_Points
-    const d = getCustomShapePath(custShapType, w, h)
+    const d = getCustomShapePath(custShapType, width, height)
     if (!isHasValidText) data.content = ''
 
     const customShapeData = {
@@ -886,7 +983,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
       isVertical,
       shapType: 'custom',
       path: d,
-      pathViewBox: { x: 0, y: 0, width: w, height: h },
+      pathViewBox,
     }
     if (isStrokeOnlyCustomGeometry(custShapType)) customShapeData.strokeOnly = true
 
@@ -1072,21 +1169,62 @@ async function processPicNode(node, warpObj, source) {
     if (srcRectAttrs.l) rect.l = srcRectAttrs.l / 1000
     if (srcRectAttrs.r) rect.r = srcRectAttrs.r / 1000
   }
-  let geom = 'rect'
+
   const prstGeom = getTextByPathList(node, ['p:spPr', 'a:prstGeom', 'attrs', 'prst'])
   const custGeom = getTextByPathList(node, ['p:spPr', 'a:custGeom'])
 
-  if (prstGeom) {
-    geom = prstGeom
-  }
-  else if (custGeom) {
-    geom = identifyShape(custGeom)
-    if (geom !== 'custom') geom = `custom:${geom}`
-  }
-
   const { borderColor, borderWidth, borderType, strokeDasharray } = getBorder(node, undefined, warpObj)
-
   const filters = getPicFilters(node['p:blipFill'])
+  const opacity = getPicFillOpacity(node['p:blipFill'])
+
+  if (prstGeom || custGeom) {
+    let shapType, path
+    if (custGeom) {
+      const identifiedShape = identifyShape(custGeom)
+      shapType = identifiedShape !== 'custom' ? `custom:${identifiedShape}` : 'custom'
+      path = getCustomShapePath(custGeom, width, height)
+    }
+    else {
+      shapType = prstGeom
+      path = getShapePath(prstGeom, width, height, node) || ''
+    }
+
+    const fill = {
+      type: 'image',
+      value: {
+        ref: imageData.ref,
+        base64: imageData.base64,
+        blob: imageData.blob,
+        opacity,
+        rect,
+      },
+    }
+
+    const shapeDataJson = {
+      type: 'shape',
+      shapType,
+      path,
+      top,
+      left,
+      width,
+      height,
+      rotate,
+      isFlipV,
+      isFlipH,
+      order,
+      fill,
+      content: '',
+      borderColor,
+      borderWidth,
+      borderType,
+      borderStrokeDasharray: strokeDasharray,
+    }
+
+    if (filters) shapeDataJson.filters = filters
+    if (link) shapeDataJson.link = link
+
+    return shapeDataJson
+  }
 
   const imageDataJson = {
     type: 'image',
@@ -1102,11 +1240,12 @@ async function processPicNode(node, warpObj, source) {
     isFlipH,
     order,
     rect,
-    geom,
+    geom: 'rect',
     borderColor,
     borderWidth,
     borderType,
     borderStrokeDasharray: strokeDasharray,
+    opacity,
   }
 
   if (filters) imageDataJson.filters = filters

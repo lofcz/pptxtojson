@@ -37,6 +37,13 @@ function createImageData(ref = '') {
     ref,
     base64: '',
     blob: '',
+    align: {
+      t: 0,
+      b: 0,
+      l: 0,
+      r: 0,
+    },
+    alignType: 'stretch',
   }
 }
 
@@ -66,7 +73,9 @@ async function loadMedia(filePath, warpObj, cacheKey, mode = 'base64') {
   const fileExt = normalizedPath.split('.').pop().toLowerCase()
   if (fileExt === 'xml') return ''
 
-  const arrayBuffer = await warpObj['zip'].file(normalizedPath).async('arraybuffer')
+  const zipFile = warpObj['zip'].file(normalizedPath)
+  if (!zipFile) return ''
+  const arrayBuffer = await zipFile.async('arraybuffer')
   const mimeType = getMimeType(fileExt)
 
   if (mode === 'base64') {
@@ -172,7 +181,39 @@ export async function getPicFill(type, node, warpObj) {
   }
   if (!imgPath) return createImageData()
 
-  return await getImageData(imgPath, warpObj)
+  const imageData = await getImageData(imgPath, warpObj)
+
+  const align = { t: 0, b: 0, l: 0, r: 0 }
+  let alignType = 'stretch'
+
+  if (node['a:stretch']) {
+    alignType = 'stretch'
+    const fillRectAttrs = getTextByPathList(node, ['a:stretch', 'a:fillRect', 'attrs'])
+    if (fillRectAttrs) {
+      if (fillRectAttrs.t) align.t = parseInt(fillRectAttrs.t) / 1000
+      if (fillRectAttrs.b) align.b = parseInt(fillRectAttrs.b) / 1000
+      if (fillRectAttrs.l) align.l = parseInt(fillRectAttrs.l) / 1000
+      if (fillRectAttrs.r) align.r = parseInt(fillRectAttrs.r) / 1000
+    }
+  }
+  else if (node['a:tile']) {
+    alignType = 'tile'
+    const tileAttrs = getTextByPathList(node, ['a:tile', 'attrs'])
+    if (tileAttrs) {
+      if (tileAttrs.t) align.t = parseInt(tileAttrs.t) / 1000
+      if (tileAttrs.b) align.b = parseInt(tileAttrs.b) / 1000
+      if (tileAttrs.l) align.l = parseInt(tileAttrs.l) / 1000
+      if (tileAttrs.r) align.r = parseInt(tileAttrs.r) / 1000
+    }
+  }
+  else if (node['a:scale']) {
+    alignType = 'scale'
+  }
+
+  imageData.align = align
+  imageData.alignType = alignType
+
+  return imageData
 }
 
 export function getPicFillOpacity(node) {
@@ -279,6 +320,7 @@ export async function getBgPicFill(bgPr, sorce, warpObj) {
 }
 
 export function getGradientFill(node, warpObj) {
+  if (!node['a:gsLst']) return null
   const gsLst = node['a:gsLst']['a:gs']
   const colors = []
   for (let i = 0; i < gsLst.length; i++) {
@@ -469,7 +511,7 @@ export async function getSlideBackgroundFill(warpObj) {
       const bgFillTyp = getFillType(bgFillLstIdx)
       if (bgFillTyp === 'SOLID_FILL') {
         const sldFill = bgFillLstIdx['a:solidFill']
-        const sldBgClr = getSolidFill(sldFill, clrMapOvr, undefined, warpObj)
+        const sldBgClr = getSolidFill(sldFill, clrMapOvr, phClr, warpObj)
         background = sldBgClr
       } 
       else if (bgFillTyp === 'GRADIENT_FILL') {
@@ -565,7 +607,7 @@ export async function getSlideBackgroundFill(warpObj) {
         const bgFillTyp = getFillType(bgFillLstIdx)
         if (bgFillTyp === 'SOLID_FILL') {
           const sldFill = bgFillLstIdx['a:solidFill']
-          const sldBgClr = getSolidFill(sldFill, clrMapOvr, undefined, warpObj)
+          const sldBgClr = getSolidFill(sldFill, clrMapOvr, phClr, warpObj)
           background = sldBgClr
         }
         else if (bgFillTyp === 'GRADIENT_FILL') {
@@ -668,7 +710,7 @@ export async function getSlideBackgroundFill(warpObj) {
           const bgFillTyp = getFillType(bgFillLstIdx)
           if (bgFillTyp === 'SOLID_FILL') {
             const sldFill = bgFillLstIdx['a:solidFill']
-            const sldBgClr = getSolidFill(sldFill, clrMapOvr, undefined, warpObj)
+            const sldBgClr = getSolidFill(sldFill, clrMapOvr, phClr, warpObj)
             background = sldBgClr
           }
           else if (bgFillTyp === 'GRADIENT_FILL') {
@@ -750,6 +792,8 @@ async function resolveShapeFillFromNode(node, warpObj, source, groupHierarchy) {
       base64: picFill.base64,
       blob: picFill.blob,
       opacity,
+      align: picFill.align,
+      alignType: picFill.alignType,
     }
     type = 'image'
   }
@@ -763,6 +807,13 @@ async function resolveShapeFillFromNode(node, warpObj, source, groupHierarchy) {
     return groupFill ? { state: 'found', fill: groupFill } : { state: 'none' }
   }
   if (!fillValue) {
+    // Shapes with useBgFill="1" take the slide background fill directly.
+    const useBgFill = getTextByPathList(node, ['attrs', 'useBgFill'])
+    if (useBgFill === '1' || useBgFill === 'true') {
+      const bgFill = await getSlideBackgroundFill(warpObj)
+      return bgFill ? { state: 'found', fill: bgFill } : { state: 'none' }
+    }
+
     const fillRefNode = getTextByPathList(node, ['p:style', 'a:fillRef'])
     // fillRef@idx indexes the theme's fillStyleLst, in which 0 is defined as "no fill". The colour
     // the reference carries is only the one that would have applied had an entry been named, so
@@ -844,6 +895,8 @@ async function findFillInGroupHierarchy(groupHierarchy, warpObj, source) {
             base64: picFill.base64,
             blob: picFill.blob,
             opacity,
+            align: picFill.align,
+            alignType: picFill.alignType,
           },
         }
       }
@@ -858,9 +911,15 @@ async function findFillInGroupHierarchy(groupHierarchy, warpObj, source) {
         }
       }
     }
+    else if (fillType === 'GROUP_FILL') {
+      continue
+    }
+    else if (fillType === 'NO_FILL') {
+      return null
+    }
   }
 
-  return null
+  return { type: 'slide-background' }
 }
 
 export function getSolidFill(solidFill, clrMap, phClr, warpObj) {

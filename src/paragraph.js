@@ -59,7 +59,7 @@ export function getHorizontalAlign(node, pNode, type, slideLayoutSpNode, slideMa
         align = 'justify'
         break
       case 'dist':
-        align = 'justify'
+        align = 'distribute'
         break
       default:
         align = 'inherit'
@@ -80,12 +80,25 @@ export function getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode) {
   return (anchor === 'ctr') ? 'mid' : ((anchor === 'b') ? 'down' : 'up')
 }
 
+export function getTextDirection(node, slideLayoutSpNode, slideMasterSpNode) {
+  const sources = [node, slideLayoutSpNode, slideMasterSpNode]
+  for (const source of sources) {
+    const direction = getTextByPathList(source, ['p:txBody', 'a:bodyPr', 'attrs', 'vert'])
+    if (direction) return direction
+  }
+  return 'horz'
+}
+
 export function getTextAutoFit(node, slideLayoutSpNode, slideMasterSpNode) {
   function checkBodyPr(bodyPr) {
     if (!bodyPr) return null
 
     if (bodyPr['a:noAutofit']) return { result: null }
-    else if (bodyPr['a:spAutoFit']) return { result: { type: 'shape' } }
+    else if (bodyPr['a:spAutoFit']) {
+      const wrap = getTextByPathList(bodyPr, ['attrs', 'wrap'])
+      const wrapText = wrap !== 'none'
+      return { result: { type: 'shape', wrapText } }
+    }
     else if (bodyPr['a:normAutofit']) {
       const fontScale = getTextByPathList(bodyPr['a:normAutofit'], ['attrs', 'fontScale'])
       if (fontScale) {
@@ -181,7 +194,7 @@ function getLineSpacingValue(spacingNode) {
   const spcPct = getTextByPathList(spacingNode, ['a:spcPct', 'attrs', 'val'])
   const spcPts = getTextByPathList(spacingNode, ['a:spcPts', 'attrs', 'val'])
 
-  if (spcPct) return parseInt(spcPct) / 1000 / 100
+  if (spcPct) return Math.round(parseInt(spcPct) / 1000 / 100 * 1.2 * 100) / 100
   if (spcPts) return parseInt(spcPts) / 100 + 'pt'
 
   return undefined
@@ -191,7 +204,7 @@ function getParagraphSpacingValue(spacingNode) {
   const spcPct = getTextByPathList(spacingNode, ['a:spcPct', 'attrs', 'val'])
   const spcPts = getTextByPathList(spacingNode, ['a:spcPts', 'attrs', 'val'])
 
-  if (spcPct) return parseInt(spcPct) / 1000 + 'em'
+  if (spcPct) return parseInt(spcPct) / 100000 + 'em'
   if (spcPts) return parseInt(spcPts) / 100 + 'pt'
 
   return undefined
@@ -228,7 +241,29 @@ export function getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slid
     }
   }
 
+  const lnSpcReductionVal = getLnSpcReduction(textBodyNode, slideLayoutSpNode, slideMasterSpNode)
+  if (lnSpcReductionVal !== undefined) {
+    const reduction = lnSpcReductionVal / 100000
+    if (spacing.lineSpacing !== undefined) {
+      if (typeof spacing.lineSpacing === 'number') {
+        spacing.lineSpacing = Math.round((spacing.lineSpacing * (1 - reduction)) * 100) / 100
+      }
+    }
+    else {
+      spacing.lineSpacing = Math.round((1 - reduction) * 100) / 100
+    }
+  }
+
   return Object.keys(spacing).length > 0 ? spacing : null
+}
+
+function getLnSpcReduction(textBodyNode, slideLayoutSpNode, slideMasterSpNode) {
+  const sources = [textBodyNode, slideLayoutSpNode && slideLayoutSpNode['p:txBody'], slideMasterSpNode && slideMasterSpNode['p:txBody']]
+  for (const src of sources) {
+    const val = getTextByPathList(src, ['a:bodyPr', 'a:normAutofit', 'attrs', 'lnSpcReduction'])
+    if (val !== undefined) return parseInt(val)
+  }
+  return undefined
 }
 
 export function getParagraphIndent(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
