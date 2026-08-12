@@ -18,6 +18,21 @@ import { getShapePath } from './shapePath'
 import { parseTransition, findTransitionNode } from './animation'
 import { getDiagramNodeContext, getSmartArtTextData } from './diagram'
 
+// Producers emit relationship types in either the ECMA-376 namespace or the
+// Microsoft 2007 extension namespace (e.g. p14 media, diagram drawings).
+const REL_TYPE_NAMESPACES = [
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/',
+  'http://schemas.microsoft.com/office/2007/relationships/',
+]
+
+function getRelTypeName(type) {
+  if (!type) return ''
+  for (const namespace of REL_TYPE_NAMESPACES) {
+    if (type.indexOf(namespace) === 0) return type.replace(namespace, '')
+  }
+  return type
+}
+
 export async function parse(file, options = {}) {
   const slides = []
   const loadedImages = {}
@@ -259,7 +274,7 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const themeResObj = {}
 
   for (const relationshipArrayItem of relationshipArray) {
-    const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
+    const relType = getRelTypeName(relationshipArrayItem['attrs']['Type'])
     let relTarget = relationshipArrayItem['attrs']['Target']
     const isExternal = relationshipArrayItem['attrs']['TargetMode'] === 'External'
     if (!isExternal) {
@@ -269,39 +284,12 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
       else relTarget = 'ppt/slides/' + relTarget
     }
 
-    switch (relationshipArrayItem['attrs']['Type']) {
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout':
-        layoutFilename = relTarget
-        slideResObj[relationshipArrayItem['attrs']['Id']] = {
-          type: relType,
-          target: relTarget
-        }
-        break
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide':
-        noteFilename = relTarget
-        slideResObj[relationshipArrayItem['attrs']['Id']] = {
-          type: relType,
-          target: relTarget
-        }
-        break
-      case 'http://schemas.microsoft.com/office/2007/relationships/diagramDrawing':
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData':
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout':
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle':
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors':
-        slideResObj[relationshipArrayItem['attrs']['Id']] = {
-          type: relType,
-          target: relTarget
-        }
-        break
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image':
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart':
-      case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink':
-      default:
-        slideResObj[relationshipArrayItem['attrs']['Id']] = {
-          type: relType,
-          target: relTarget,
-        }
+    if (relType === 'slideLayout') layoutFilename = relTarget
+    else if (relType === 'notesSlide') noteFilename = relTarget
+
+    slideResObj[relationshipArrayItem['attrs']['Id']] = {
+      type: relType,
+      target: relTarget,
     }
   }
   
@@ -317,22 +305,19 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     if (relationshipArray) {
       if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
       for (const relationshipArrayItem of relationshipArray) {
-        const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
+        const relType = getRelTypeName(relationshipArrayItem['attrs']['Type'])
         let relTarget = relationshipArrayItem['attrs']['Target']
         relTarget = relTarget.replace(/\\/g, '/')
         if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
         else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
         else relTarget = 'ppt/slideLayouts/' + relTarget
 
-        switch (relationshipArrayItem['attrs']['Type']) {
-          case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster':
-            masterFilename = relTarget
-            break
-          default:
-            layoutResObj[relationshipArrayItem['attrs']['Id']] = {
-              type: relType,
-              target: relTarget,
-            }
+        if (relType === 'slideMaster') masterFilename = relTarget
+        else {
+          layoutResObj[relationshipArrayItem['attrs']['Id']] = {
+            type: relType,
+            target: relTarget,
+          }
         }
       }
     }
@@ -348,22 +333,19 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     if (relationshipArray) {
       if (relationshipArray.constructor !== Array) relationshipArray = [relationshipArray]
       for (const relationshipArrayItem of relationshipArray) {
-        const relType = relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', '')
+        const relType = getRelTypeName(relationshipArrayItem['attrs']['Type'])
         let relTarget = relationshipArrayItem['attrs']['Target']
         relTarget = relTarget.replace(/\\/g, '/')
         if (relTarget.indexOf('/ppt/') === 0) relTarget = relTarget.substr(1)
         else if (relTarget.indexOf('../') !== -1) relTarget = relTarget.replace('../', 'ppt/')
         else relTarget = 'ppt/slideMasters/' + relTarget
 
-        switch (relationshipArrayItem['attrs']['Type']) {
-          case 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme':
-            themeFilename = relTarget
-            break
-          default:
-            masterResObj[relationshipArrayItem['attrs']['Id']] = {
-              type: relType,
-              target: relTarget,
-            }
+        if (relType === 'theme') themeFilename = relTarget
+        else {
+          masterResObj[relationshipArrayItem['attrs']['Id']] = {
+            type: relType,
+            target: relTarget,
+          }
         }
       }
     }
@@ -386,7 +368,7 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
           else relTarget = relTarget.replace('../', 'ppt/')
 
           themeResObj[relationshipArrayItem['attrs']['Id']] = {
-            'type': relationshipArrayItem['attrs']['Type'].replace('http://schemas.openxmlformats.org/officeDocument/2006/relationships/', ''),
+            'type': getRelTypeName(relationshipArrayItem['attrs']['Type']),
             'target': relTarget
           }
         }
