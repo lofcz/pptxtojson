@@ -190,6 +190,19 @@ All numeric length values in the output JSON use `pt` (point) as the unit.
 		- Duration `duration`
 		- Direction `direction`
 
+	- Element animations `animations` (from `p:timing`, presenter order)
+		- Target shape id `spid` (matches the element's `id` / `p:cNvPr@id`)
+		- Trigger `trigger`: `onClick` | `withPrevious` | `afterPrevious`
+		- Preset class `class`: `entr` | `exit` | `emph` | `path` | `verb` | `mediacall`
+		- Preset id `presetId` and subtype `presetSubtype` (direction / variant)
+		- Duration `duration` and delay `delay` (milliseconds)
+		- Optional effect filter `filter` (fade, wipe, barn, …)
+
+	- Build list `builds` (from `p:bldLst`)
+		- Target shape id `spid`
+		- Type `type`: `paragraph` | `diagram` | `graphic` | `oleChart`
+		- Animate background `animBg`
+
 	- Slide elements `elements` / master layout elements `layoutElements`
 		- OOXML ID `id`
 		- Text

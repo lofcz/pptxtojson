@@ -343,12 +343,41 @@ export interface SlideTransition {
   direction: string | null
 }
 
+export type AnimationTrigger = 'onClick' | 'withPrevious' | 'afterPrevious'
+export type AnimationClass = 'entr' | 'exit' | 'emph' | 'path' | 'verb' | 'mediacall'
+export type SlideBuildType = 'paragraph' | 'diagram' | 'graphic' | 'oleChart'
+
+export interface SlideAnimation {
+  /** cNvPr id of the target shape (`p:spTgt@spid`) */
+  spid: string
+  trigger: AnimationTrigger
+  class: AnimationClass
+  presetId: number
+  presetSubtype: number
+  /** Duration in milliseconds */
+  duration: number
+  /** Delay in milliseconds before the effect starts */
+  delay: number
+  /** `p:animEffect@filter` when present (fade, wipe, barn, …) */
+  filter?: string
+}
+
+export interface SlideBuild {
+  spid: string
+  type: SlideBuildType
+  animBg?: boolean
+}
+
 export interface Slide {
   fill: Fill
   elements: Element[]
   layoutElements: Element[]
   note: string
   transition?: SlideTransition | null
+  /** Click / withPrevious / afterPrevious effects in presenter order */
+  animations: SlideAnimation[]
+  /** `p:bldLst` paragraph / graphic / diagram builds */
+  builds: SlideBuild[]
 }
 
 export interface Options {

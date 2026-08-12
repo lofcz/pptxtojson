@@ -15,7 +15,7 @@ import { getTableBorders, getTableCellParams, getTableRowParams } from './table'
 import { RATIO_EMUs_Points } from './constants'
 import { findOMath, oMathToLatex } from './math'
 import { getShapePath } from './shapePath'
-import { parseTransition, findTransitionNode } from './animation'
+import { parseTransition, findTransitionNode, parseTiming } from './animation'
 import { getDiagramNodeContext, getSmartArtTextData } from './diagram'
 
 // Producers emit relationship types in either the ECMA-376 namespace or the
@@ -419,6 +419,7 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   if (!transitionNode) transitionNode = findTransitionNode(slideMasterContent, 'p:sldMaster')
 
   const transition = parseTransition(transitionNode)
+  const { animations, builds } = parseTiming(slideContent)
 
   const showMasterSpOnSlide = getTextByPathList(slideContent, ['p:sld', 'attrs', 'showMasterSp'])
   const isHidden = v => v === '0' || v === 'false'
@@ -431,6 +432,8 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     note,
     transition,
     hideBackground,
+    animations,
+    builds,
   }
 }
 

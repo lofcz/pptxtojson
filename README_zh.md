@@ -190,6 +190,19 @@ func()
 		- 持续时间 `duration`
 		- 方向 `direction`
 
+	- 元素动画 `animations`（来自 `p:timing`，按放映顺序）
+		- 目标形状 id `spid`（与元素 `id` / `p:cNvPr@id` 对应）
+		- 触发方式 `trigger`：`onClick` | `withPrevious` | `afterPrevious`
+		- 预设类别 `class`：`entr` | `exit` | `emph` | `path` | `verb` | `mediacall`
+		- 预设 id `presetId` 与子类型 `presetSubtype`（方向 / 变体）
+		- 持续时间 `duration` 与延迟 `delay`（毫秒）
+		- 可选效果滤镜 `filter`（fade、wipe、barn 等）
+
+	- 逐段出现列表 `builds`（来自 `p:bldLst`）
+		- 目标形状 id `spid`
+		- 类型 `type`：`paragraph` | `diagram` | `graphic` | `oleChart`
+		- 是否动画背景 `animBg`
+
 	- 页面内元素 `elements` / 母版元素 `layoutElements`
 		- OOXML ID `id`
 		- 文字
