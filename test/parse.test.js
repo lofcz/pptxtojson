@@ -124,6 +124,24 @@ test('parses deck structure', async () => {
   assert.ok(json.slides.every(slide => Array.isArray(slide.animations) && Array.isArray(slide.builds)))
 })
 
+test('discovers slides from presentation.xml.rels when Content_Types omits slide Overrides', async () => {
+  const zip = await JSZip.loadAsync(readFileSync(fixture('zlomky.pptx')))
+  const typesPath = Object.keys(zip.files).find(n => n.replace(/\\/g, '/') === '[Content_Types].xml')
+  assert.ok(typesPath, '[Content_Types].xml present')
+  let types = await zip.file(typesPath).async('string')
+  types = types.replace(/<Override[^>]*presentationml\.slide\+xml[^>]*\/>/g, '')
+  assert.equal(
+    (types.match(/presentationml\.slide\+xml/g) || []).length,
+    0,
+    'fixture must have no slide Overrides after strip',
+  )
+  zip.file(typesPath, types)
+  const buf = await zip.generateAsync({ type: 'nodebuffer' })
+  const json = await parse(buf.buffer, { imageMode: 'none' })
+  assert.equal(json.slides.length, 4)
+  assert.ok(json.slides.every(slide => Array.isArray(slide.elements) && slide.elements.length > 0))
+})
+
 test('converts inline OMML math to LaTeX spans', async () => {
   const json = await loadDeck('zlomky.pptx')
   const contents = json.slides.flatMap(s => s.elements).map(el => el.content || '')

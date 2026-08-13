@@ -85,32 +85,90 @@ export async function parse(file, options = {}) {
   }
 }
 
+function asNodeArray(node) {
+  if (!node) return []
+  return node.constructor === Array ? node : [node]
+}
+
+function sortSlideXml(p1, p2) {
+  const n1 = +(/(\d+)\.xml/.exec(p1)?.[1] || 0)
+  const n2 = +(/(\d+)\.xml/.exec(p2)?.[1] || 0)
+  return n1 - n2
+}
+
+function resolvePresentationTarget(target) {
+  let relTarget = String(target || '').replace(/\\/g, '/')
+  if (!relTarget) return ''
+  if (relTarget.indexOf('/ppt/') === 0) return relTarget.substr(1)
+  if (relTarget.indexOf('../') !== -1) return relTarget.replace('../', 'ppt/')
+  if (relTarget.indexOf('ppt/') === 0) return relTarget
+  return 'ppt/' + relTarget.replace(/^\//, '')
+}
+
+function relationshipRid(attrs) {
+  if (!attrs) return ''
+  return attrs['r:id'] || attrs.rId || ''
+}
+
+async function getSlidesFromPresentation(zip) {
+  const relsContent = await readXmlFile(zip, 'ppt/_rels/presentation.xml.rels')
+  const relItems = asNodeArray(getTextByPathList(relsContent, ['Relationships', 'Relationship']))
+  const relsMap = {}
+  const slideTargets = []
+
+  for (const rel of relItems) {
+    const id = getTextByPathList(rel, ['attrs', 'Id'])
+    const type = getTextByPathList(rel, ['attrs', 'Type'])
+    const target = getTextByPathList(rel, ['attrs', 'Target'])
+    if (!id || !target) continue
+    const loc = resolvePresentationTarget(target)
+    if (!loc) continue
+    relsMap[id] = loc
+    if (getRelTypeName(type) === 'slide') slideTargets.push(loc)
+  }
+
+  const presentation = await readXmlFile(zip, 'ppt/presentation.xml')
+  const sldIds = asNodeArray(getTextByPathList(presentation, ['p:presentation', 'p:sldIdLst', 'p:sldId']))
+  const ordered = []
+  for (const sldId of sldIds) {
+    const rid = relationshipRid(sldId?.attrs)
+    if (rid && relsMap[rid]) ordered.push(relsMap[rid])
+  }
+  if (ordered.length) return ordered
+  return slideTargets.sort(sortSlideXml)
+}
+
 async function getContentTypes(zip) {
   const ContentTypesJson = await readXmlFile(zip, '[Content_Types].xml')
-  const subObj = ContentTypesJson['Types']['Override']
+  const overrides = asNodeArray(getTextByPathList(ContentTypesJson, ['Types', 'Override']))
   let slidesLocArray = []
   let slideLayoutsLocArray = []
 
-  for (const item of subObj) {
-    switch (item['attrs']['ContentType']) {
+  for (const item of overrides) {
+    const contentType = item?.attrs?.ContentType
+    const partName = item?.attrs?.PartName
+    if (!contentType || !partName) continue
+    const loc = String(partName).replace(/^\//, '')
+    switch (contentType) {
       case 'application/vnd.openxmlformats-officedocument.presentationml.slide+xml':
-        slidesLocArray.push(item['attrs']['PartName'].substr(1))
+        slidesLocArray.push(loc)
         break
       case 'application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml':
-        slideLayoutsLocArray.push(item['attrs']['PartName'].substr(1))
+        slideLayoutsLocArray.push(loc)
         break
       default:
     }
   }
-  
-  const sortSlideXml = (p1, p2) => {
-    const n1 = +/(\d+)\.xml/.exec(p1)[1]
-    const n2 = +/(\d+)\.xml/.exec(p2)[1]
-    return n1 - n2
-  }
+
   slidesLocArray = slidesLocArray.sort(sortSlideXml)
   slideLayoutsLocArray = slideLayoutsLocArray.sort(sortSlideXml)
-  
+
+  // Some producers (older PptxGenJS) omit slide Overrides and only declare
+  // Default Extension="xml". OPC still lists slides in presentation.xml.rels.
+  if (!slidesLocArray.length) {
+    slidesLocArray = await getSlidesFromPresentation(zip)
+  }
+
   return {
     slides: slidesLocArray,
     slideLayouts: slideLayoutsLocArray,
