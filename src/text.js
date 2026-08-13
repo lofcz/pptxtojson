@@ -1,6 +1,8 @@
-import { getHorizontalAlign, getParagraphSpacing, getParagraphIndent } from './paragraph'
+import { getHorizontalAlign, getParagraphSpacing, getParagraphIndent, getParagraphStyleNodes } from './paragraph'
 import { getTextByPathList, escapeHtml } from './utils'
 import { getInlineMathRuns, getMathRunStyleNode, mathRunHasOwnSize, mathRunHasOwnColor } from './math'
+import { getFillType } from './fill'
+import { getSchemeColorFromTheme } from './schemeColor'
 
 import {
   getFontType,
@@ -70,18 +72,20 @@ export function genTextBody(textBodyNode, spNode, slideLayoutSpNode, slideMaster
     const align = getHorizontalAlign(pNode, spNode, type, slideLayoutSpNode, slideMasterSpNode, warpObj)
     const spacing = getParagraphSpacing(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
     const indent = getParagraphIndent(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
-    const listType = getListType(pNode)
+    const listType = getListType(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
     const listLevel = getListLevel(pNode)
 
     let alignStyle = align
     if (align === 'distribute') alignStyle = 'justify'
-    let styleText = `text-align: ${alignStyle};line-height: 1.2;`
+    let styleText = `text-align: ${alignStyle};`
     if (align === 'distribute') styleText += `text-align-last: justify;text-justify: distribute;`
     if (spacing) {
       if (spacing.lineSpacing) styleText += `line-height: ${spacing.lineSpacing};`
+      else styleText += `line-height: 1.2;`
       if (spacing.spaceBefore) styleText += `margin-top: ${spacing.spaceBefore};`
       if (spacing.spaceAfter) styleText += `margin-bottom: ${spacing.spaceAfter};`
     }
+    else styleText += `line-height: 1.2;`
     if (indent) {
       if (!listType && indent.marginLeft) styleText += `margin-left: ${indent.marginLeft};`
       if (!listType && indent.textIndent) styleText += `text-indent: ${indent.textIndent};`
@@ -204,28 +208,53 @@ function getMathRunStyleText(mathRun, siblingRun, pNode, textBodyNode, pFontStyl
   return styleText
 }
 
-export function getListType(node) {
-  const pPrNode = node['a:pPr']
-  if (!pPrNode) return ''
-
-  if (pPrNode['a:buNone']) return ''
-
+export function getListType(node, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
   const hasContent = node['a:r'] || node['a:br'] || node['a:fld']
   if (!hasContent) return ''
 
-  if (pPrNode['a:buChar']) return 'ul'
-  if (pPrNode['a:buAutoNum']) return 'ol'
-  
+  const styleNodes = getParagraphStyleNodes(node, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj)
+  if (!styleNodes) return ''
+
+  for (const styleNode of styleNodes) {
+    if (styleNode['a:buNone']) return ''
+    if (styleNode['a:buChar'] || styleNode['a:buBlip']) return 'ul'
+    if (styleNode['a:buAutoNum']) return 'ol'
+  }
+
   return ''
 }
 export function getListLevel(node) {
   const pPrNode = node['a:pPr']
-  if (!pPrNode) return -1
+  if (!pPrNode) return 0
 
   const lvlNode = getTextByPathList(pPrNode, ['attrs', 'lvl'])
   if (lvlNode !== undefined) return parseInt(lvlNode)
 
   return 0
+}
+
+function schemeColorToCss(color) {
+  if (!color) return ''
+  return color.startsWith('#') ? color : `#${color}`
+}
+
+function applyHyperlinkRunStyle(styleText, node, warpObj) {
+  let next = styleText
+  const runStyleNode = getTextByPathList(node, ['a:rPr'])
+  const runFill = runStyleNode ? getFillType(runStyleNode) : ''
+  const runHasOwnColor = runFill === 'SOLID_FILL' || runFill === 'GRADIENT_FILL'
+  if (!runHasOwnColor) {
+    const hlinkColor = schemeColorToCss(getSchemeColorFromTheme('a:hlink', warpObj)) || '#0563C1'
+    if (/color\s*:/.test(next)) next = next.replace(/color\s*:\s*[^;]+;/, `color: ${hlinkColor};`)
+    else next += `color: ${hlinkColor};`
+  }
+
+  const runUnderline = getTextByPathList(node, ['a:rPr', 'attrs', 'u'])
+  if (runUnderline !== 'none' && !/text-decoration\s*:\s*underline/.test(next)) {
+    next += 'text-decoration: underline;'
+  }
+
+  return next
 }
 
 export function genSpanElement(node, pNode, textBodyNode, pFontStyle, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, defaultTextStyle, warpObj) {
@@ -281,6 +310,7 @@ export function getSpanStyleInfo(node, pNode, textBodyNode, pFontStyle, slideLay
 
   const linkID = getTextByPathList(node, ['a:rPr', 'a:hlinkClick', 'attrs', 'r:id'])
   const hasLink = linkID && warpObj['slideResObj'][linkID]
+  if (hasLink) styleText = applyHyperlinkRunStyle(styleText, node, warpObj)
 
   return {
     styleText,

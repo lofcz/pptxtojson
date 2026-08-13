@@ -96,23 +96,65 @@ function sortSlideXml(p1, p2) {
   return n1 - n2
 }
 
-function resolvePresentationTarget(target) {
-  let relTarget = String(target || '').replace(/\\/g, '/')
-  if (!relTarget) return ''
-  if (relTarget.indexOf('/ppt/') === 0) return relTarget.substr(1)
-  if (relTarget.indexOf('../') !== -1) return relTarget.replace('../', 'ppt/')
-  if (relTarget.indexOf('ppt/') === 0) return relTarget
-  return 'ppt/' + relTarget.replace(/^\//, '')
+function normalizePartName(name) {
+  return String(name || '').replace(/\\/g, '/').replace(/^\//, '')
+}
+
+function relationshipsPartFor(partName) {
+  const name = normalizePartName(partName)
+  const slash = name.lastIndexOf('/')
+  const dir = slash === -1 ? '' : name.slice(0, slash + 1)
+  const file = slash === -1 ? name : name.slice(slash + 1)
+  return `${dir}_rels/${file}.rels`
+}
+
+function resolvePartTarget(sourcePart, target) {
+  const raw = String(target || '').replace(/\\/g, '/')
+  if (!raw) return ''
+  if (raw.startsWith('/')) return normalizePartName(raw)
+  const source = normalizePartName(sourcePart)
+  const slash = source.lastIndexOf('/')
+  const dir = slash === -1 ? '' : source.slice(0, slash + 1)
+  const out = []
+  for (const seg of `${dir}${raw}`.split('/')) {
+    if (!seg || seg === '.') continue
+    if (seg === '..') out.pop()
+    else out.push(seg)
+  }
+  return out.join('/')
 }
 
 function relationshipRid(attrs) {
   if (!attrs) return ''
+  // ECMA-376 §4.3.1.29: location is r:id (ST_RelationshipId), not the numeric ST_SlideId @id.
   return attrs['r:id'] || attrs.rId || ''
 }
 
+async function getPresentationPart(zip) {
+  // ECMA-376 §13.2: the Presentation part is the target of the package officeDocument relationship.
+  const rels = asNodeArray(getTextByPathList(await readXmlFile(zip, '_rels/.rels'), ['Relationships', 'Relationship']))
+  for (const rel of rels) {
+    const type = getTextByPathList(rel, ['attrs', 'Type'])
+    const target = getTextByPathList(rel, ['attrs', 'Target'])
+    const targetMode = getTextByPathList(rel, ['attrs', 'TargetMode'])
+    if (targetMode && String(targetMode).toLowerCase() === 'external') continue
+    if (getRelTypeName(type) === 'officeDocument' && target) {
+      const loc = resolvePartTarget('', target)
+      if (loc) return loc
+    }
+  }
+  return 'ppt/presentation.xml'
+}
+
 async function getSlidesFromPresentation(zip) {
-  const relsContent = await readXmlFile(zip, 'ppt/_rels/presentation.xml.rels')
-  const relItems = asNodeArray(getTextByPathList(relsContent, ['Relationships', 'Relationship']))
+  // ECMA-376 §13.3.8: each Slide part is an Internal relationship from the Presentation part.
+  // ECMA-376 §4.3.1.29–30: p:sldIdLst document order is the slide list; r:id resolves the part.
+  // Content_Types Overrides are MIME mappings (Part 2 §9.1.2.2); their order is not significant.
+  const presentationPart = await getPresentationPart(zip)
+  const relItems = asNodeArray(getTextByPathList(
+    await readXmlFile(zip, relationshipsPartFor(presentationPart)),
+    ['Relationships', 'Relationship'],
+  ))
   const relsMap = {}
   const slideTargets = []
 
@@ -120,14 +162,16 @@ async function getSlidesFromPresentation(zip) {
     const id = getTextByPathList(rel, ['attrs', 'Id'])
     const type = getTextByPathList(rel, ['attrs', 'Type'])
     const target = getTextByPathList(rel, ['attrs', 'Target'])
+    const targetMode = getTextByPathList(rel, ['attrs', 'TargetMode'])
     if (!id || !target) continue
-    const loc = resolvePresentationTarget(target)
+    if (targetMode && String(targetMode).toLowerCase() === 'external') continue
+    const loc = resolvePartTarget(presentationPart, target)
     if (!loc) continue
     relsMap[id] = loc
     if (getRelTypeName(type) === 'slide') slideTargets.push(loc)
   }
 
-  const presentation = await readXmlFile(zip, 'ppt/presentation.xml')
+  const presentation = await readXmlFile(zip, presentationPart)
   const sldIds = asNodeArray(getTextByPathList(presentation, ['p:presentation', 'p:sldIdLst', 'p:sldId']))
   const ordered = []
   for (const sldId of sldIds) {
@@ -135,13 +179,13 @@ async function getSlidesFromPresentation(zip) {
     if (rid && relsMap[rid]) ordered.push(relsMap[rid])
   }
   if (ordered.length) return ordered
-  return slideTargets.sort(sortSlideXml)
+  return slideTargets
 }
 
 async function getContentTypes(zip) {
   const ContentTypesJson = await readXmlFile(zip, '[Content_Types].xml')
   const overrides = asNodeArray(getTextByPathList(ContentTypesJson, ['Types', 'Override']))
-  let slidesLocArray = []
+  const overrideSlides = []
   let slideLayoutsLocArray = []
 
   for (const item of overrides) {
@@ -151,7 +195,7 @@ async function getContentTypes(zip) {
     const loc = String(partName).replace(/^\//, '')
     switch (contentType) {
       case 'application/vnd.openxmlformats-officedocument.presentationml.slide+xml':
-        slidesLocArray.push(loc)
+        overrideSlides.push(loc)
         break
       case 'application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml':
         slideLayoutsLocArray.push(loc)
@@ -160,13 +204,11 @@ async function getContentTypes(zip) {
     }
   }
 
-  slidesLocArray = slidesLocArray.sort(sortSlideXml)
   slideLayoutsLocArray = slideLayoutsLocArray.sort(sortSlideXml)
 
-  // Some producers (older PptxGenJS) omit slide Overrides and only declare
-  // Default Extension="xml". OPC still lists slides in presentation.xml.rels.
+  let slidesLocArray = await getSlidesFromPresentation(zip)
   if (!slidesLocArray.length) {
-    slidesLocArray = await getSlidesFromPresentation(zip)
+    slidesLocArray = overrideSlides.sort(sortSlideXml)
   }
 
   return {

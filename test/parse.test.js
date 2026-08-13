@@ -124,7 +124,11 @@ test('parses deck structure', async () => {
   assert.ok(json.slides.every(slide => Array.isArray(slide.animations) && Array.isArray(slide.builds)))
 })
 
-test('discovers slides from presentation.xml.rels when Content_Types omits slide Overrides', async () => {
+function slideFingerprint(slide) {
+  return (slide.elements || []).map(el => el.content || '').join('\n')
+}
+
+test('discovers slides from p:sldIdLst when Content_Types omits slide Overrides', async () => {
   const zip = await JSZip.loadAsync(readFileSync(fixture('zlomky.pptx')))
   const typesPath = Object.keys(zip.files).find(n => n.replace(/\\/g, '/') === '[Content_Types].xml')
   assert.ok(typesPath, '[Content_Types].xml present')
@@ -140,6 +144,32 @@ test('discovers slides from presentation.xml.rels when Content_Types omits slide
   const json = await parse(buf.buffer, { imageMode: 'none' })
   assert.equal(json.slides.length, 4)
   assert.ok(json.slides.every(slide => Array.isArray(slide.elements) && slide.elements.length > 0))
+})
+
+test('orders slides from p:sldIdLst document order, not Override or filename order', async () => {
+  const original = await loadDeck('zlomky.pptx')
+  const zip = await JSZip.loadAsync(readFileSync(fixture('zlomky.pptx')))
+  const presPath = Object.keys(zip.files).find(n => n.replace(/\\/g, '/') === 'ppt/presentation.xml')
+  assert.ok(presPath, 'ppt/presentation.xml present')
+  let pres = await zip.file(presPath).async('string')
+  const ids = [...pres.matchAll(/<p:sldId\b[\s\S]*?(?:\/>|<\/p:sldId>)/g)].map(m => m[0])
+  assert.ok(ids.length >= 2, 'fixture needs at least two p:sldId entries')
+  pres = pres.replace(/<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/, `<p:sldIdLst>${ids.slice().reverse().join('')}</p:sldIdLst>`)
+  zip.file(presPath, pres)
+
+  const typesPath = Object.keys(zip.files).find(n => n.replace(/\\/g, '/') === '[Content_Types].xml')
+  let types = await zip.file(typesPath).async('string')
+  const slideOverrides = [...types.matchAll(/<Override[^>]*presentationml\.slide\+xml[^>]*\/>/g)].map(m => m[0])
+  if (slideOverrides.length) {
+    types = types.replace(/<Override[^>]*presentationml\.slide\+xml[^>]*\/>/g, '')
+    types = types.replace('</Types>', `${slideOverrides.join('')}</Types>`)
+  }
+  zip.file(typesPath, types)
+
+  const json = await parse((await zip.generateAsync({ type: 'nodebuffer' })).buffer, { imageMode: 'none' })
+  assert.equal(json.slides.length, original.slides.length)
+  assert.equal(slideFingerprint(json.slides[0]), slideFingerprint(original.slides.at(-1)))
+  assert.equal(slideFingerprint(json.slides.at(-1)), slideFingerprint(original.slides[0]))
 })
 
 test('converts inline OMML math to LaTeX spans', async () => {

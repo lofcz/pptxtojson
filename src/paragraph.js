@@ -173,7 +173,7 @@ function appendDefaultTextParagraphStyleNodes(styleNodes, defaultTextStyle, lvl)
   pushParagraphStyleNode(styleNodes, getTextByPathList(defaultTextStyle, ['a:defPPr']))
 }
 
-function getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
+export function getParagraphStyleNodes(pNode, textBodyNode, slideLayoutSpNode, slideMasterSpNode, type, slideMasterTextStyles, warpObj) {
   if (!pNode) return null
 
   const pPrNode = pNode['a:pPr']
