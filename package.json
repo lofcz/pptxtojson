@@ -1,6 +1,6 @@
 {
 	"name": "@lofcz/pptxtojson",
-	"version": "2.2.3",
+	"version": "2.2.4",
 	"description": "A javascript tool for parsing .pptx file (fork)",
 	"type": "module",
 	"main": "./dist/index.umd.js",
